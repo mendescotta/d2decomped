@@ -21,11 +21,12 @@ Usage: norespawn_d2d.py <path-to-d2d>
    same roll), its groups not (a fetish camp the map places stands
    there every game), and the figurine drops again; the quest done
    (debug quest 20), the next game's uniques stay down too.
-Skips without the MPQs or the 1.14d patch.
+Skips without the MPQs or the 1.14d patch unless D2D_REQUIRE_GAME_DATA=1.
 """
 import os
 import platform
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -36,8 +37,8 @@ d2d = sys.argv[1]
 data = os.environ.get("D2_MPQ_DIR") or os.path.expanduser("~/Workspace/private/diablo2")
 patch = os.environ.get("D2_PATCH_INSTALLER")
 if not os.path.exists(os.path.join(data, "d2data.mpq")) or not patch or not os.path.exists(patch):
-    print("SKIP: the MPQs or D2_PATCH_INSTALLER not found")
-    sys.exit(0)
+    print("missing MPQs or D2_PATCH_INSTALLER" + (" (required)" if os.environ.get("D2D_REQUIRE_GAME_DATA") == "1" else "; SKIP"))
+    sys.exit(1 if os.environ.get("D2D_REQUIRE_GAME_DATA") == "1" else 0)
 
 BLOOD_MOOR, DEN, SPIDER_FOREST = 2, 8, 76
 GOLDEN_BIRD = 0x14
@@ -52,6 +53,7 @@ store = os.path.join(save_dir, NAME + ".norespawn")
 sock_path = os.path.join(tempfile.gettempdir(), f"d2d_norespawn_{os.getpid()}.sock")
 env = dict(os.environ, HOME=home)
 env.pop("D2_MPQ_DIR", None)
+games = []
 
 
 def cmd(line):
@@ -129,7 +131,12 @@ class Game:
             args += ["--start-screen", "ingame", "--start-class", "0", "--start-name", name]
         else:
             args += ["--start-screen", "charselect", "--start-name", name]
-        self.proc = subprocess.Popen(args, env=env, stdout=self.log, stderr=self.log)
+        try:
+            self.proc = subprocess.Popen(args, env=env, stdout=self.log, stderr=self.log)
+        except BaseException:
+            self.log.close()
+            raise
+        games.append(self)
         until("devctl", lambda: cmd("ping"))
         if not new:
             until("character select", lambda: state()["screen"] == "charselect")
@@ -154,6 +161,8 @@ class Game:
 try:
     # 1: a new character; 2 of the Blood Moor's left, 1 of the Den's.
     game = Game("first", new=True)
+    if os.environ.get("D2D_TEST_FAIL_AFTER_START") == "1":
+        raise RuntimeError("injected failure after starting d2d")
     go(BLOOD_MOOR, "quarters")
     first_moor = len(alive())
     assert first_moor > 2, f"the Blood Moor came up with {first_moor} monsters"
@@ -222,5 +231,20 @@ try:
     game.quit()
     print("norespawn_d2d: PASS")
 finally:
+    for started in games:
+        if started.proc.poll() is None:
+            try:
+                cmd("quit")
+                started.proc.wait(timeout=5)
+            except (OSError, AssertionError, subprocess.TimeoutExpired):
+                if started.proc.poll() is None:
+                    started.proc.terminate()
+                    try:
+                        started.proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        started.proc.kill()
+                        started.proc.wait(timeout=5)
+        started.log.close()
     if os.path.exists(sock_path):
         os.unlink(sock_path)
+    shutil.rmtree(home)

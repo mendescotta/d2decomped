@@ -68,3 +68,8 @@ A store of another map seed starts over.
 - Tests: `tests/test_norespawn.cpp` (the store, the rule, a session) and
   `tests/norespawn_d2d.py` (games of one character over devctl: kills
   kept, a level emptied, the Den, the Golden Bird, the mod off).
+  Configure with `D2_MPQ_DIR` and `D2_PATCH_INSTALLER` to make missing
+  data fail this integration test; without them it skips.
+  `D2D_TEST_FAIL_AFTER_START=1` checks its cleanup path by injecting an
+  error after game startup; `tests/headless_cleanup.py` runs that check
+  automatically with a fake devctl server.
