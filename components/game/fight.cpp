@@ -7,6 +7,8 @@
 #include "gamedata.hpp"
 #include "log.hpp"
 
+#include <norespawn_game.hpp>
+
 #include <combat.hpp>
 #include <d2s.hpp>
 #include <d2s_items.hpp>
@@ -4738,6 +4740,7 @@ auto Fight::rooms_up(const Level& here, float x, float y, bool arrived) -> void 
             const auto& spawns = spawning.levels[grown].spawns;
             const auto& region = std::size_t(grown->id) < spawning.regions.size() ? spawning.regions[std::size_t(grown->id)] : d2d::rules::Region{};
             auto made = spawn_monsters(*game_data, std::span(spawns).subspan(from), region, rng, game_difficulty, int(heroes.size()));
+            d2d::mods::norespawn::thin(norespawn, *grown, made, from, actor->character.header.quests[std::size_t(std::clamp(game_difficulty, 0, 2))], heroes.size());
             auto& into = grown == mon_level ? monsters : kept[grown];
             for (auto& monster : made) { monster.id = next_id++; into.push_back(std::move(monster)); }
         }
