@@ -31,6 +31,41 @@ monster-ai.md.
   / S1 damage and to-hit, and El1..3 MinD / MaxD as DM % the same way
   (length as written). Checked: `tools/emu/monstats.py` (every row ×
   difficulty, 2202/2202).
+- **MonProp** (the end of `FUN_00573cb0`): `FUN_00573470` finds the row
+  by MonStats `+0x1a` (MonProp; the table at `[0x744304]+0xc30`, count
+  `+0xc34`, 0x138 bytes a row, loaded as `monprop` by `FUN_00658720` into
+  `0x96c860`). The row is +0 Id, then per difficulty (`+4 + 0x60 ×
+  difficulty`, the column `FUN_00573cb0` uses for the level) six
+  {prop, par, min, max} ints, then the chances, a byte each at `+0x124 +
+  6 × difficulty + slot`. The slots run in order up to the first prop
+  below 0. A slot with chance 0 always applies; any other steps the unit
+  seed (+0x20, × 0x6ac690c5 + carry) and applies when the seed % 100 is
+  below the chance. Applying is the item-property path,
+  `FUN_0065fd70(0, 0, unit, 0, 0, 0, slot, 0, 0x40, 0)`. In the stock
+  rows every chance is 0. Read from game.exe's own tables in the
+  emulator: Mephisto (MonStats 242, 704) props 86 cast2 and 56 swing2,
+  15 / 30; Blunderbore (186..189, 618, 619) 108 crush, 15 / 25; the
+  Council (345..347) 244 extra-fire, 40 / 100; baalhighpriest (557) 60 /
+  120; Blood Raven (267) 60 knock in Hell only; quillrat6..8 (605..607)
+  54 thorns 15..20 / 30..40; baboon6 (295) 262 fade 1 / 2 / 2; druidhawk
+  (419) 91 stupidity −1. No MonStats row names row 1 (irongolem, fade 16),
+  and nothing else reads the table, so the Iron Golem's row never applies
+  in 1.14d.
+  - What they do (`rules::monster_props`, `game::anim_rate_pct`,
+    `game::monprop_hit`): swing2 / cast2 are IAS 93 / FCR 105 on its A1 /
+    A2 and SC rates (`FUN_00623f50` → `FUN_00621740`, 120 × v / (120 +
+    v)). Thorns (78, damagedinmelee func 6, `FUN_005bf670`) puts its flat
+    value on a melee striker as physical damage through `FUN_0057c6c0` →
+    `FUN_0057c1e0`, so its damage reduction applies. Knockback (81, func 7,
+    `FUN_005bf960`) is a seed draw's low 7 bits under 0x40 against a
+    player, result flag 8. Crushing blow (136, func 16, `FUN_005bffc0`) is
+    a seed draw % 100 under the value: current life / 10 for a player or a
+    pet (4 for a monster, 8 for a boss), doubled for the missile event,
+    less damage reduction %, after the hit. Stupidity (`FUN_005bfaa0`)
+    acts on monster targets only; fade is drawn by the client; fire
+    mastery reaches only missiles the monster owns, and the Council's and
+    baalhighpriest's fire comes from their Hydra's heads, so none of
+    those three acts.
 
 ## Monster region — FUN_005479c0 / FUN_005475e0
 

@@ -337,6 +337,7 @@ struct Monster {
     std::vector<std::pair<int, int>> path;
     bool half_freeze = false;
     int variant = -1;                         // the knights' rand(4) as made (d2d::rules::monster_variant), -1 none
+    d2d::rules::MonProps props;               // its MonProp row's (d2d::rules::monster_props)
     [[nodiscard]] bool alive() const { return hit_points > 0 && !gone; }
     [[nodiscard]] bool targetable() const { return alive() && killable && !buried && !aloft && !riding; }   // unit flags 0xe: not a buried maggot, a vulture aloft, a riding imp, an unkillable one
     // As a target for the player's (or the merc's) hits.
@@ -348,6 +349,21 @@ struct Monster {
         return { hit_points, stats.hit_points, stats.armor_class, stats.level, type_info.can_block ? per_difficulty.to_block : 0, res, per_difficulty.drain };
     }
 };
+
+// A monster's mode rate over its AnimData speed, % more (FUN_00623f50):
+// anim_pct (attackrate / other_animrate from auras), and its MonProp
+// IAS on its attack modes (A1, A2: 0x6e8b90 / 0x6e8cd0 mark them so for
+// every monster) and FCR on its cast mode (SC, FUN_006216e0), each
+// 120 x v / (120 + v) (FUN_00621740's table at 0x6e8e24). A skill's
+// sequence plays as SQ, neither.
+// ponytail: S1..S4 / SQ are attack modes too for a monster holding a
+// weapon (FUN_00621580), never here; FUN_00623f50's 15..175 clamps and
+// the cast mode's skipping attackrate / other_animrate aren't applied.
+inline int anim_rate_pct(const Monster& monster, std::string_view mode) {
+    if (mode == "A1" || mode == "A2") return monster.anim_pct + d2d::rules::effective_speed(monster.props.ias);
+    if (mode == "SC") return monster.anim_pct + d2d::rules::effective_speed(monster.props.fcr);
+    return monster.anim_pct;
+}
 
 // Whoever the monsters are after (the player, the merc), and what they
 // did to it this frame. The player comes first and its pets after it, as in
@@ -368,6 +384,8 @@ struct Foe {
     // Armor: the event's +8 over 0), by Monster::id: monsters born this frame may move the vector.
     std::vector<int> melee_by, damaged_by;
     std::vector<int> fired_by;                // the owners of the ReturnFire missiles that reached it this frame (Chilling Armor)
+    std::vector<int> shot_by;                 // the owners of the monster missiles that hit it this frame (their MonProp events)
+    std::vector<int> crushed;                 // Crushing Blows this frame, each its life divisor (MonProp crush, FUN_005bffc0)
     int hits = 0;                             // hits that landed this frame (each wears its armour)
     bool running = false;                     // the player in RN: always hit by a swing, block a third
     [[nodiscard]] d2d::rules::Motion motion() const { return running ? d2d::rules::Motion::running : moving ? d2d::rules::Motion::walking : d2d::rules::Motion::standing; }
@@ -393,6 +411,24 @@ struct Foe {
         chill_ticks = std::max(chill_ticks, taken.chill_ticks);
     }
 };
+
+// A monster's MonProp hit events on a foe it hit (FUN_005c0c30 over its
+// event list +0x90; the melee event, or the missile one, 6, for its
+// missile's): each draws on the monster's seed.
+// - Knockback (stat 81, func 7, FUN_005bf960): a draw's low 7 bits under
+//   0x40 (half), result flag 8 from where the monster stands.
+// - Crushing Blow (stat 136, func 16, FUN_005bffc0): a draw % 100 under
+//   the value; it takes current life / divisor, less its damage reduction
+//   %, after the hit: 10 for a player or a pet, 4 a monster, doubled for a
+//   missile.
+// ponytail: against a monster (Confuse) knock's 0x20 / 0x80 by its flags
+// (FUN_00451fe0) and crush's 8 for a boss (FUN_0063e9f0, FUN_005a0180)
+// aren't read.
+inline void monprop_hit(Monster& monster, Foe& foe, bool missile) {
+    if (monster.props.knock > 0 && (monster.seed.next() & 0x7f) < 0x40) foe.knocked_from = std::pair{ monster.unit.x, monster.unit.y };
+    if (monster.props.crush > 0 && int(monster.seed.next() % 100) < monster.props.crush)
+        foe.crushed.push_back((foe.of && !foe.pet ? 4 : 10) * (missile ? 2 : 1));
+}
 
 constexpr float kMeleeReach = 1.1f;           // cells between centres
 
@@ -676,7 +712,9 @@ void missiles_update(const Level& level, std::vector<Missile>& ms_, std::span<Fo
             const int key = -100 - int(&foe - foes.data());         // a ring's missiles strike each foe once
             if (std::ranges::contains(*missile.struck, key)) continue;
             missile.struck->push_back(key);
-            foe.take(d2d::rules::monster_blow(foe.fighter, foe.level, foe.motion(), missile.src, true, rng, true));
+            const auto taken = d2d::rules::monster_blow(foe.fighter, foe.level, foe.motion(), missile.src, true, rng, true);
+            foe.take(taken);
+            if (taken.hit && missile.owner >= 0) foe.shot_by.push_back(missile.owner);
             if (missile.info && missile.info->hit_func == 19 && missile.skill >= 0) foe.marked = { missile.skill, missile.level };   // FUN_005ab110
             if (missile.info && missile.info->return_fire && missile.owner >= 0) foe.fired_by.push_back(missile.owner);
             return true;

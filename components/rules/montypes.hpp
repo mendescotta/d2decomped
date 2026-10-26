@@ -50,6 +50,11 @@ struct MonType {
     // El1..3 Mode ("A1", "A2", ...) and Type (0 fire, 1 light, 2 cold, 3 poison, 4 magic, -1 none).
     std::array<std::string, 3> el_mode;
     std::array<int, 3> el_type{ -1, -1, -1 };
+    // MonProp.txt, its row by MonStats MonProp (record +0x1a, FUN_00573470):
+    // per difficulty prop1..6 up to the first empty one, as Properties.txt
+    // codes with their chance (0: always), what FUN_00573cb0 ends on.
+    struct Prop { std::string code, param; int min = 0, max = 0, chance = 0; };
+    std::array<std::vector<Prop>, 3> props;
     bool can_block = false;                     // MonStats2 mBL
     bool critter = false;                       // MonStats2 critter (flags bit 13): struck, no impact sound (FUN_004ca560)
     int hit_class = 0;                          // MonStats2 HitClass (FUN_00623c20): the impact on what it strikes

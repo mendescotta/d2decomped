@@ -138,6 +138,7 @@ std::vector<Monster> spawn_monsters(const GameData& game_data, std::span<const d
         d2d::rules::Rng unit_seed{ spawn.seed };
         const auto look = d2d::rules::monster_look(sets, type_info.choices, unit_seed);
         monster.variant = d2d::rules::monster_variant(spawn.type, unit_seed);
+        monster.props = d2d::rules::monster_props(game_data.rules, type_info, difficulty, unit_seed);   // FUN_00573cb0's end, after the look
         for (std::size_t layer = 0; layer < 16; ++layer)
             if (look[layer] < type_info.parts[layer].size()) monster.npc.comp[layer] = type_info.parts[layer][look[layer]];
         if (boss) make_boss(game_data, monster, spawn.boss, spawn.mods, spawn.super, spawn.name_seed, difficulty, rng, players);
@@ -168,7 +169,7 @@ void set_mode(const GameData& game_data, Monster& monster, std::string_view mode
     monster.seq_frame = -1;                                   // a sequence's row: drawn again as it plays
     monster.unit.mode_ms = now_ms;
     monster.unit.walking = mode == "WL" || mode == "RN";
-    monster.mode_until = mode == "NU" || mode == "WL" || mode == "DD" ? 0 : now_ms + game_data.npc_timing(monster.npc, mode).length_ms() * 100 / std::uint32_t(100 + monster.anim_pct);
+    monster.mode_until = mode == "NU" || mode == "WL" || mode == "DD" ? 0 : now_ms + game_data.npc_timing(monster.npc, mode).length_ms() * 100 / std::uint32_t(100 + anim_rate_pct(monster, mode));
 }
 
 std::vector<UnitState> npc_start(const Level& level) {
@@ -1719,7 +1720,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
             return false;
         }
         const int lvl = skill_level(game_data, monster, monster.skill);
-        const std::uint32_t frame_ms = std::max<std::uint32_t>(game_data.npc_timing(monster.npc, "A1").ms_per_frame() * 100 / std::uint32_t(100 + monster.anim_pct), 1);
+        const std::uint32_t frame_ms = std::max<std::uint32_t>(game_data.npc_timing(monster.npc, "A1").ms_per_frame() * 100 / std::uint32_t(100 + anim_rate_pct(monster, "A1")), 1);
         const int rows = int((now_ms - monster.whirl_ms) / frame_ms);
         for (; monster.whirl_row <= rows; ++monster.whirl_row) {
             const auto& row = (*seq)[std::size_t(monster.whirl_row) % seq->size()];
@@ -1791,7 +1792,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                 const int event = (*seq)[std::size_t(monster.seq_done)].event;
                 if (event == 4 || ((event == 1 || event == 2) && !monster.seq_once)) ++due;
             }
-        } else if (!monster.struck && now_ms >= unit.mode_ms + timing.action_ms() * 100 / std::uint32_t(100 + monster.anim_pct)) {
+        } else if (!monster.struck && now_ms >= unit.mode_ms + timing.action_ms() * 100 / std::uint32_t(100 + anim_rate_pct(monster, monster.mode))) {
             monster.struck = true;
             due = 1;
         }
@@ -2348,6 +2349,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                     monster.frenzy.until = now_ms + std::uint32_t(std::max(d2d::rules::eval_calc(game_data.skills, struck_with->auralen, {}, monster.skill, lvl), 1)) * 40;
                 }
                 foe.take(taken);
+                if (taken.hit) monprop_hit(monster, foe, false);
                 if (taken.hit && smite && (struck_with->result_flags & 8)) foe.knocked_from = std::pair{ unit.x, unit.y };
                 if (taken.hit && smite) foe.stun_ticks = std::max(foe.stun_ticks, d2d::rules::eval_calc(game_data.skills, struck_with->calc[1], {}, monster.skill, skill_level(game_data, monster, monster.skill)));
                 if (taken.hit && monster.mana_hi > 0) foe.mana_burn += rng.range(monster.mana_lo, monster.mana_hi);   // Mana Burn
@@ -2560,6 +2562,10 @@ Monster make_monster(const GameData& game_data, int type, float x, float y, d2d:
     if (stats) monster.stats = d2d::rules::monster_stats(game_data.monsters, type, difficulty, rng, 0, players);
     monster.hit_points = monster.last_hp = monster.stats.hit_points;
     monster.difficulty = std::clamp(difficulty, 0, 2);
+    // Its MonProp row; spawn_monsters takes it again on the unit seed.
+    // ponytail: here a min..max slot draws on the seed it has yet (no shipped
+    // row with one is made this way).
+    monster.props = d2d::rules::monster_props(game_data.rules, type_info, monster.difficulty, monster.seed);
     return monster;
 }
 

@@ -129,8 +129,28 @@ void swing_max_damages() {
     assert(d2d::rules::swing_max_damage(stats, "S2") == 10);
 }
 
+// MonProp slots (FUN_00573cb0's end): in order, a chance slot stepping the
+// unit seed first, the item property path's min..max draw on it too.
+static void monster_prop_rolls() {
+    Tables tables;
+    tables.properties["thorns"] = { { .func = 1, .stat = 78 } };
+    tables.properties["swing2"] = { { .func = 1, .stat = 93 } };
+    MonType quill;
+    quill.props[2] = { { "thorns", "", 30, 40, 0 }, { "swing2", "", 20, 20, 50 } };
+    for (std::uint32_t start = 1; start < 40; ++start) {
+        Rng seed(start), expect(start);
+        const auto props = monster_props(tables, quill, 2, seed);
+        const int thorns = expect.range(30, 40);
+        const bool swings = int(expect.next() % 100) < 50;
+        assert(props.thorns == thorns && props.ias == (swings ? 20 : 0) && seed.low == expect.low);
+    }
+    Rng seed(5);
+    assert(monster_props(tables, quill, 0, seed).thorns == 0 && seed.low == 5);   // none in normal
+}
+
 int main() {
     missile_flights();
+    monster_prop_rolls();
     diablo_scores();
     swing_max_damages();
     Monsters monsters;

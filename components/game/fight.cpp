@@ -948,6 +948,13 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         const auto target = std::size_t(actor->attack_mon);
         const auto blow = d2d::rules::player_blow(fighter, target_of(target), int(actor->character.stats.get(d2d::d2s::kLevel)), rng, current_swing);
         land(target, blow, true, now_ms);
+        // A MonProp thorns monster (stat 78, damagedinmelee func 6,
+        // FUN_005bf670): its flat value back on a melee striker as physical
+        // damage, through the striker's damage reduction (FUN_0057c6c0 ->
+        // FUN_0057c1e0, as a monster's blow).
+        // ponytail: the merc's swings (merc_fight) take none.
+        if (const int thorns = target_monster.props.thorns; blow.hit && thorns > 0)
+            actor->self_hurt += std::int64_t(std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0)) << 8;
         if (blow.hit && charging) charge(*skill, now_ms);
         if (blow.hit && finishing) release(target, now_ms);
         if (blow.hit && skill && skill->srvdofunc == ServerDoFunction::kDragonTail) dragon_tail(*skill, target, blow.phys, now_ms);
@@ -4513,6 +4520,9 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
                 }
                 return false;
             }, [&](int owner) { const int index = monster_index(owner); return index >= 0 && monsters[std::size_t(index)].alive(); });
+            for (auto& foe : foes)                               // the shooters' MonProp events (knock, crush)
+                for (const int owner : foe.shot_by)
+                    if (const int shooter = monster_index(owner); shooter >= 0) monprop_hit(monsters[std::size_t(shooter)], foe, true);
             for (const auto& side : sides) {
                 act_as(*side.hero);
                 return_fire(foes[side.at], now_ms);              // the missiles that reached the player just now
@@ -4548,6 +4558,11 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
 // this frame: the merc's life and flinch, then the player's poison, chill,
 // stun, knockback, curses, Mana Burn, block, armour wear and life.
 auto Fight::hurt_side(std::span<Foe> side, std::uint32_t now_ms) -> void {
+        if (actor->merc && actor->merc->mode != "DT")           // Crushing Blows, after the hits (monprop_hit)
+            for (const int divisor : side[1].crushed) {
+                const int crush = std::max(actor->merc->hit_points - side[1].damage, 0) / divisor;
+                side[1].damage += std::max(crush - crush * side[1].fighter.dr_pct / 100, 0);
+            }
         if (actor->merc && side[1].damage > 0 && actor->merc->mode != "DT") {
             actor->merc->hit_points -= side[1].damage;
             auto& unit = actor->merc->unit;
@@ -4640,6 +4655,14 @@ auto Fight::hurt_side(std::span<Foe> side, std::uint32_t now_ms) -> void {
         if (foe.damage > 0 && !dead()) {                    // a dead player takes no more (no second death)
             actor->character.stats.values[kLife] -= std::int64_t(foe.damage) << 8;
             if (actor->character.stats.values[kLife] <= 0) { die(now_ms); died = true; }
+        }
+        for (const int divisor : foe.crushed) {             // Crushing Blows, after the hits: life / divisor less DR % (FUN_005bffc0)
+            if (died || dead()) break;
+            auto& life = actor->character.stats.values[kLife];
+            const std::int64_t crush = life / divisor;
+            life = std::max<std::int64_t>(life - (crush - crush * foe.fighter.dr_pct / 100), 0);
+            d2d::log::info("crushing blow: -{} life", (crush - crush * foe.fighter.dr_pct / 100) >> 8);
+            if (life <= 0) { die(now_ms); died = true; }
         }
         // Stunned, every landed hit is a get-hit, however small, even one
         // absorbed to nothing (FUN_0057cee0: state 21 skips FUN_0057cb00's
