@@ -83,11 +83,11 @@ def stores(pe, start):
             elif ops[1].type == x86.X86_OP_REG:
                 reg = ins.reg_name(ops[1].reg)
                 out.append((ops[0].mem.disp, regs[reg] if regs.get(reg) is not None else reg))
-        elif ops and ops[0].type == x86.X86_OP_REG:       # anything else writing a register forgets it
-            regs.pop(ins.reg_name(ops[0].reg), None)
-        elif ins.mnemonic == "call":                     # and a call, eax / ecx / edx
+        elif ins.mnemonic == "call":                     # a call (`call eax` too) forgets eax / ecx / edx
             for reg in ("eax", "ecx", "edx"):
                 regs.pop(reg, None)
+        elif ops and ops[0].type == x86.X86_OP_REG:       # anything else writing a register forgets it
+            regs.pop(ins.reg_name(ops[0].reg), None)
     return out
 
 
