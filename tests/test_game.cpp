@@ -425,6 +425,30 @@ int main(int argc, char** argv) try {
         assert(std::abs(spot->first - start_x) < 100 && std::abs(spot->second - start_y) < 100);
     }
     std::printf("OK: %s in level %d at (%.1f, %.1f)\n", character.name.c_str(), view.level->id, view.player.x, view.player.y);
+    {   // A walk's % (FUN_00623f50): 100, a run's run x 100 / walk (stamina left),
+        // effective FRW 150 x v / (150 + v), chill's -50, at least 25.
+        auto& walker = *world.actor;
+        const auto stamina = walker.character.stats.values[d2d::d2s::kStamina];
+        const int run_percent = data->run_velocity[kBarbarian] * 100 / data->walk_velocity[kBarbarian];
+        const int frw = std::exchange(walker.player_combat.frw, 0);
+        assert(stamina > 0 && run_percent > 100 && !walker.running && world.walk_percent(walker, 26 * kTickMs) == 100);
+        walker.running = true;
+        assert(world.walk_percent(walker, 26 * kTickMs) == run_percent);
+        walker.player_combat.frw = 50;
+        assert(world.walk_percent(walker, 26 * kTickMs) == run_percent + 37);
+        walker.character.stats.values[d2d::d2s::kStamina] = 0;                    // out of stamina: a walk
+        assert(world.walk_percent(walker, 26 * kTickMs) == 137);
+        walker.character.stats.values[d2d::d2s::kStamina] = stamina;
+        walker.running = false; walker.player_combat.frw = 0; walker.chilled = 27 * kTickMs;
+        assert(world.walk_percent(walker, 26 * kTickMs) == 50 && world.walk_percent(walker, 27 * kTickMs) == 100);
+        walker.player_combat.frw = -100;                                            // the floor
+        assert(world.walk_percent(walker, 26 * kTickMs) == 25);
+        walker.player_combat.frw = frw; walker.chilled = 0;
+        // A joined game's other player: its class's run / walk, no FRW, chill from its states.
+        assert(World::walk_percent(*data, kBarbarian, true, 0, false) == run_percent);
+        assert(World::walk_percent(*data, kBarbarian, false, 0, true) == 50 && World::walk_percent(*data, 99, false, 0, false) == 100);
+        assert(d2d::rules::moving_anim_rate(true, World::walk_percent(*data, kBarbarian, true, 0, false)) == 0x65 * run_percent / 100);
+    }
 
     // d2d's autoloot (deviations.md #5): gold under the player goes into the purse.
     const auto purse = world.actor->character.stats.get(d2d::d2s::kGold);

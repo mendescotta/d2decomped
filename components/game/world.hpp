@@ -126,7 +126,7 @@ struct View {
     // A joined game's other players (a game.exe host's 0x59 / 0x0f): not
     // replicated, the client sets them after each View (apps/d2d netgame).
     struct OtherPlayer { UnitState unit; int cls = 0; std::string name; std::uint32_t id = 0; GameData::Appearance gfx{}; int mode = -1; bool running = false;
-                        std::vector<std::string_view> states; bool ghost = false; int walk_percent = 100; };   // id: the host's unit; mode: an act, -1 walk / stand; states: the host's on it (States.txt names); ghost: local co-op's dead; walk_percent: as View's (a joined game's: 100)
+                        std::vector<std::string_view> states; bool ghost = false; int walk_percent = 100; };   // id: the host's unit; mode: an act, -1 walk / stand; states: the host's on it (States.txt names); ghost: local co-op's dead; walk_percent: as View's (a joined game's: its class's run or walk and chill, no FRW)
     std::vector<OtherPlayer> others;
     // Local co-op's death (docs/design/local-coop.md): the screen's player a
     // ghost; everyone dead (the death screen, Esc back to town); the bodies
@@ -693,6 +693,7 @@ struct World {
     void tower_treasure(std::uint32_t now_ms);
     void stamina_frame();                  // a 40 ms frame's stamina drain / regen
     [[nodiscard]] int walk_percent(const Player& player, std::uint32_t now_ms) const;   // a player's walk % (FUN_00623f50)
+    [[nodiscard]] static int walk_percent(const GameData& data, int save_class, bool run, int frw, bool chilled);   // the same from its parts
     void footstep_frame(std::uint32_t tick_ms);   // the player's footsteps on this tick (FUN_004caf60)
     void find_voice(std::uint32_t tick_ms);       // the class's find line 62 ticks into a level (FUN_004cc270)
     [[nodiscard]] bool game_quest_done(std::size_t quest) const;   // the game's flag 13 on a quest

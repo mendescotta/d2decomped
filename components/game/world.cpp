@@ -2605,17 +2605,6 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
         }
     }
 
-// A frame's stamina (FUN_00580c20 / FUN_00580810 event 3): a run outside
-// town drains it (FUN_0057f240), at 0 the run is a walk (FUN_0057f090: no
-// run at stamina 0); then it regens by mode (FUN_00580500).
-// ponytail: the run stays a run while stamina lasts and walks at 0 each
-// frame, not at the next move as game.exe; the same since a walk at 0 never
-// regens.
-// A walking or running player's footsteps (FUN_004caf60): two a cycle of the
-// walk's animation, from its start, on the floor tile under them (its DT1
-// material, else the level's SoundEnviron Material 1), each at least two
-// thirds of a step after the last. The animation's rate is the walk's
-// (rules::moving_anim_rate), as the client's footsteps read it (unit +0x4c).
 auto World::greet_sound(const Npc& npc, int kind) -> int {
         const auto* greeting = d2d::rules::sound_ids::greeting_of(npc.hc_idx);
         if (!greeting) return 0;
@@ -2632,6 +2621,11 @@ auto World::greet_sound(const Npc& npc, int kind) -> int {
         return row;
     }
 
+// A walking or running player's footsteps (FUN_004caf60): two a cycle of the
+// walk's animation, from its start, on the floor tile under them (its DT1
+// material, else the level's SoundEnviron Material 1), each at least two
+// thirds of a step after the last. The animation's rate is the walk's
+// (rules::moving_anim_rate), as the client's footsteps read it (unit +0x4c).
 auto World::footstep_frame(std::uint32_t tick_ms) -> void {
         using namespace d2d::rules::sound_ids;
         const int cls = actor->character.character_class;
@@ -2654,14 +2648,26 @@ auto World::footstep_frame(std::uint32_t tick_ms) -> void {
 // FUN_00623f50's walk %: velocitypercent (100; running, run x 100 / walk),
 // faster run/walk's effective % (150 x v / (150 + v)) and chill's -50, at
 // least 25. It scales both the walk's velocity and its animation.
-auto World::walk_percent(const Player& player, std::uint32_t now_ms) const -> int {
-        const auto save_class = std::size_t(std::max(player.character.character_class, 0));
-        const int walk = std::max(game_data->walk_velocity[save_class], 1);
-        const int base = player.running && player.character.stats.values[d2d::d2s::kStamina] > 0 ? game_data->run_velocity[save_class] * 100 / walk : 100;
-        const int chill = now_ms < player.chilled ? -50 : 0;   // Fight::chill_rate, for any player
-        return std::max(base + d2d::rules::effective_speed(player.player_combat.frw, 150) + chill, 25);
+auto World::walk_percent(const GameData& data, int save_class, bool run, int frw, bool chilled) -> int {
+        if (data.walk_velocity.empty() || data.run_velocity.size() < data.walk_velocity.size()) return 100;
+        const auto row = std::size_t(std::clamp(save_class, 0, int(data.walk_velocity.size()) - 1));
+        const int walk = std::max(data.walk_velocity[row], 1);
+        const int base = run ? data.run_velocity[row] * 100 / walk : 100;
+        const int chill = chilled ? -50 : 0;   // Fight::chill_rate, for any player
+        return std::max(base + d2d::rules::effective_speed(frw, 150) + chill, 25);
     }
 
+auto World::walk_percent(const Player& player, std::uint32_t now_ms) const -> int {
+        const bool run = player.running && player.character.stats.values[d2d::d2s::kStamina] > 0;
+        return walk_percent(*game_data, player.character.character_class, run, player.player_combat.frw, now_ms < player.chilled);
+    }
+
+// A frame's stamina (FUN_00580c20 / FUN_00580810 event 3): a run outside
+// town drains it (FUN_0057f240), at 0 the run is a walk (FUN_0057f090: no
+// run at stamina 0); then it regens by mode (FUN_00580500).
+// ponytail: the run stays a run while stamina lasts and walks at 0 each
+// frame, not at the next move as game.exe; the same since a walk at 0 never
+// regens.
 auto World::stamina_frame() -> void {
         using namespace d2d::d2s;
         if (fight.dead()) return;

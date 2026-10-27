@@ -63,6 +63,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -788,6 +789,9 @@ auto Town::net_overlay() -> void {
                 shown.skill_ms = unit.skill_ms;
                 other.unit.mode_ms = shown.since;
                 other.states = host_states(unit.states);
+                // Its walk's % from its class's run / walk and the host's chill (state 11);
+                // ponytail: its FRW isn't sent, so a faster run / walk's legs don't show.
+                other.walk_percent = World::walk_percent(*world.game_data, unit.cls, other.running, 0, std::ranges::find(other.states, std::string_view("cold")) != other.states.end());
                 view.others.push_back(std::move(other));
                 continue;
             }
