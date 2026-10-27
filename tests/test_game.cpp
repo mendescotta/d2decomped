@@ -331,9 +331,9 @@ int main(int argc, char** argv) try {
     character.panel = panel_stats(*data, character.header, character.items, character.stats);
 
     {
-        // A fallen shaman's rally goes to its leader's group only. One with
-        // no leader (made outside a group, or its leader gone) sends nothing, and
-        // doesn't reach others with none (FUN_0058f730).
+        // A fallen shaman's rally goes to its leader's group only. One made
+        // outside a group (leader -1) sends nothing, and doesn't reach others
+        // with none (FUN_0058f730).
         const auto shaman_row = data->monsters.by_id.find("fallenshaman1"), fallen_row = data->monsters.by_id.find("fallen1");
         assert(shaman_row != data->monsters.by_id.end() && fallen_row != data->monsters.by_id.end());
         auto rallied = [&](int leader) {
