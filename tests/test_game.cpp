@@ -1071,6 +1071,16 @@ int main(int argc, char** argv) try {
             assert(pet.monster.hit_points == life);
             coop.fight.pet_strike(pet, prey_index, { .hit = true }, now_ms);
             assert(pet.monster.hit_points == life - d2d::rules::resisted(40, resist));
+            // And on the player's melee blow (the strike's and Dragon
+            // Flight's kick), through damage reduction %, then flat.
+            d2d::rules::Fighter striker;
+            striker.dr_pct = 20; striker.dr_flat = 3;
+            const auto hurt = coop.fight.actor->self_hurt;
+            coop.fight.player_thorns(prey_index, { .hit = false }, striker);
+            assert(coop.fight.actor->self_hurt == hurt);
+            coop.fight.player_thorns(prey_index, { .hit = true }, striker);
+            assert(coop.fight.actor->self_hurt == hurt + (std::int64_t(40 * 80 / 100 - 3) << 8));
+            coop.fight.actor->self_hurt = hurt;
             coop.fight.monsters[prey_index].props.thorns = 0;
         }
         coop.fight.monsters[prey_index].hit_points = 0;

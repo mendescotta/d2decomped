@@ -1743,6 +1743,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
             const auto taken = d2d::rules::monster_blow(struck.fighter, struck.level, struck.motion(), skill_strike(game_data, monster, *spin, lvl), false, rng);
             struck.take(taken);
             if (taken.hit) struck.hit_class = type_info.hit_class;
+            if (taken.hit) monprop_hit(monster, struck, false);         // a melee blow: MonProp knock / crush, as the strike's
             struck.melee_by.push_back(monster.id);
         }
         monster.seq_frame = (*seq)[std::size_t(rows) % seq->size()].frame;
@@ -1893,7 +1894,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                     if (foe.alive && dist <= kMeleeReach + 0.3f) {
                         const auto taken = d2d::rules::monster_blow(foe.fighter, foe.level, foe.motion(), skill_strike(game_data, monster, *leap, skill_level(game_data, monster, monster.skill)), false, rng);
                         foe.take(taken);
-                        if (taken.hit) { foe.knocked_from = std::pair{ unit.x, unit.y }; foe.hit_class = type_info.hit_class; }
+                        if (taken.hit) { foe.knocked_from = std::pair{ unit.x, unit.y }; foe.hit_class = type_info.hit_class; monprop_hit(monster, foe, false); }
                         d2d::log::info("{} lands its leap attack ({})", monster.npc.name, taken.hit ? "hit" : "missed");
                         foe.melee_by.push_back(monster.id);
                     }
