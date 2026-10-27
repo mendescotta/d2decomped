@@ -302,6 +302,8 @@ auto Fight::monster_sounds(Monster& monster, std::uint32_t now_ms) -> void {
             if (sounds) play(sounds->flee, now_ms);
             monster.flee_sound = false;
         }
+        // Jab's event-3 rows (FUN_004f4590): a monster's dosound b.
+        for (; monster.seq_sounds > 0; --monster.seq_sounds) play(monster.seq_sound, now_ms);
         // As it first shows (FUN_004cc380): its Init, outside town, a Neutral's start.
         if (!monster.sounded) {
             monster.sounded = true;
@@ -402,8 +404,9 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             const auto ticks = d2d::rules::attack_ticks(int(anim.frames), int(anim.speed ? anim.speed : 256), actor->player_combat.ias, actor->player_combat.wsm, chill_rate(now_ms));
             len = std::uint32_t(ticks) * 40;
             // The swing (FUN_004cc5b0: A1 / A2, a Barbarian's S3, an Assassin's S4): its weapon_* that many frames in.
+            // A sequence plays in SQ (0x12), which the dispatcher leaves silent (the table at 0x4cc74c).
             const int cls = actor->character.character_class;
-            if (mode == kModeA1 || mode == kModeA2 || (mode == kModeS3 && cls == d2d::d2s::kBarbarian) || (mode == kModeS4 && cls == d2d::d2s::kAssassin)) {
+            if (skill_sequence().empty() && (mode == kModeA1 || mode == kModeA2 || (mode == kModeS3 && cls == d2d::d2s::kBarbarian) || (mode == kModeS4 && cls == d2d::d2s::kAssassin))) {
                 const auto swing = d2d::rules::sound_ids::kSwing[std::size_t(actor->player_combat.hit_class & 0xf)];
                 const int speed = d2d::rules::attack_speed(int(anim.speed ? anim.speed : 256), actor->player_combat.ias, actor->player_combat.wsm, chill_rate(now_ms));
                 cues.cue(swing.sound, now_ms + std::uint32_t((swing.frames * 256 + 128) / speed) * 40, actor->player.x, actor->player.y);
@@ -685,18 +688,24 @@ auto Fight::start_swing(std::uint32_t now_ms) -> bool {
 auto Fight::start_sequence(std::uint32_t now_ms) -> void {
         actor->seq = {};
         actor->seq_struck = 0;
-        const auto* skill = game_data->skills.get(actor->swing_skill);
-        if (!skill || actor->swing_skill == 0 || skill->anim != "SQ" || skill->seqnum <= 0) return;
-        const auto& attack_anim = player_anim(kModeA1);
-        std::string weapon_class = attack_anim.name.size() >= 7 ? attack_anim.name.substr(4) : "hth";
-        for (auto& letter : weapon_class) letter = char(std::tolower((unsigned char)letter));
-        actor->seq = d2d::rules::sequence(skill->seqnum, weapon_class);
+        actor->seq_sounded = 0;
+        actor->seq = skill_sequence();
         if (actor->seq.empty()) return;
-        start_move(*skill, now_ms);
+        const auto& attack_anim = player_anim(kModeA1);
+        start_move(*game_data->skills.get(actor->swing_skill), now_ms);
         const auto ticks = d2d::rules::attack_ticks(int(actor->seq.size()), int(attack_anim.speed ? attack_anim.speed : 256), actor->player_combat.ias, actor->player_combat.wsm, chill_rate(now_ms));
         actor->pmode_until = now_ms + std::uint32_t(ticks) * 40;
         actor->seq_frame_ms = std::max<std::uint32_t>(std::uint32_t(ticks) * 40 / std::uint32_t(actor->seq.size()), 1);
         actor->prate = 1.f;
+    }
+
+auto Fight::skill_sequence() const -> std::span<const d2d::rules::SeqFrame> {
+        const auto* skill = game_data->skills.get(actor->swing_skill);
+        if (!skill || actor->swing_skill == 0 || skill->anim != "SQ" || skill->seqnum <= 0) return {};
+        const auto& attack_anim = player_anim(kModeA1);
+        std::string weapon_class = attack_anim.name.size() >= 7 ? attack_anim.name.substr(4) : "hth";
+        for (auto& letter : weapon_class) letter = char(std::tolower((unsigned char)letter));
+        return d2d::rules::sequence(skill->seqnum, weapon_class);
     }
 
 auto Fight::start_move(const d2d::rules::Skill& skill, std::uint32_t now_ms) -> void {
@@ -720,12 +729,12 @@ auto Fight::seq_at(std::uint32_t now_ms) const -> std::size_t {
         return actor->seq_loop ? frame_index % actor->seq.size() : std::min(frame_index, actor->seq.size() - 1);
     }
 
-auto Fight::seq_events(std::uint32_t now_ms) const -> int {
+auto Fight::seq_events(std::uint32_t now_ms, int event) const -> int {
         const auto frame_index = std::size_t((now_ms - actor->player.mode_ms) / actor->seq_frame_ms);
-        const auto per = std::ranges::count(actor->seq, 1, &d2d::rules::SeqFrame::event);
+        const auto per = std::ranges::count(actor->seq, event, &d2d::rules::SeqFrame::event);
         const auto last = actor->seq_loop ? frame_index : std::min(frame_index, actor->seq.size() - 1);
         int events = actor->seq_loop ? int(last / actor->seq.size() * std::size_t(per)) : 0;
-        for (std::size_t k = 0; k <= last % (actor->seq_loop ? actor->seq.size() : ~std::size_t{ 0 }) && k < actor->seq.size(); ++k) events += actor->seq[k].event == 1;
+        for (std::size_t k = 0; k <= last % (actor->seq_loop ? actor->seq.size() : ~std::size_t{ 0 }) && k < actor->seq.size(); ++k) events += actor->seq[k].event == event;
         return events;
     }
 
@@ -920,6 +929,12 @@ auto Fight::strike(std::uint32_t now_ms) -> void {
             return;
         }
         if (!actor->seq.empty()) {
+            // The client runs the skill's do on each event 1..4 frame (FUN_004af4d0 ->
+            // FUN_004c68f0); Jab's (cltdofunc 16, FUN_004f4590) plays dosound a on the
+            // event-3 ones, before some of its thrusts.
+            if (const auto* skill = game_data->skills.get(actor->swing_skill); skill && skill->clt_do_func == 16)
+                for (const int sounds = seq_events(now_ms, 3); actor->seq_sounded < sounds; ++actor->seq_sounded)
+                    cues.cue(skill->do_sound_a, now_ms, actor->player.x, actor->player.y);
             const int due = seq_events(now_ms);
             while (actor->seq_struck < due) {
                 ++actor->seq_struck;
@@ -2321,6 +2336,7 @@ auto Fight::move_event(const d2d::rules::Skill& skill, std::uint32_t now_ms) -> 
                     actor->smove.active = false;
                     actor->player.mode_ms = now_ms - std::uint32_t(run_end) * actor->seq_frame_ms;
                     actor->seq_struck = seq_events(now_ms);
+                    actor->seq_sounded = seq_events(now_ms, 3);
                     actor->pmode_until = now_ms + std::uint32_t(actor->seq.size() - run_end) * actor->seq_frame_ms;
                 }
                 return;

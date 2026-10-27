@@ -458,6 +458,38 @@ int main(int argc, char** argv) try {
     // curses go, chill stays; a thawing potion's takes the chill.
     auto& fight = world.fight;
     auto& hero = *world.actor;
+    // Jab (cltdofunc 16, FUN_004f4590): the client's do runs on each event
+    // frame and plays dosound a on the event-3 ones of the sequence.
+    {
+        const auto* jab = data->skills.get(10);
+        assert(jab && jab->clt_do_func == 16 && jab->do_sound_a == data->sound_index.at("weapon_1ht_1") && jab->do_sound_b == data->sound_index.at("weapon_2ht_1"));
+        const int barbarian = hero.character.character_class;
+        const auto look = hero.character.appearance;
+        hero.character.character_class = d2d::d2s::kAmazon;      // her starting javelin: 1ht, which has Jab's sequence
+        hero.character.appearance.reset();
+        hero.swing_skill = 10;
+        world.cues.due.clear();
+        fight.set_pmode(kModeA1, 2000 * kTickMs);
+        fight.start_sequence(2000 * kTickMs);
+        assert(hero.seq.size() == d2d::rules::sequence(1, "1ht").size());
+        // SQ (0x12) plays no swing (FUN_004cc5b0): only Jab's start, its stsoundclass (amazon_jab).
+        assert(world.cues.due.size() == 1 && world.cues.due[0].sound == jab->st_sound_class);
+        world.cues.due.clear();
+        const auto sound_frames = std::ranges::count(hero.seq, 3, &d2d::rules::SeqFrame::event);
+        assert(sound_frames == 3);
+        fight.strike(2000 * kTickMs + std::uint32_t(hero.seq.size()) * hero.seq_frame_ms);
+        assert(std::ranges::count(world.cues.due, jab->do_sound_a, &Cues::Cue::sound) == sound_frames);
+        fight.strike(2000 * kTickMs + std::uint32_t(hero.seq.size()) * hero.seq_frame_ms);   // once each
+        assert(std::ranges::count(world.cues.due, jab->do_sound_a, &Cues::Cue::sound) == sound_frames);
+        hero.character.character_class = barbarian;
+        hero.character.appearance = look;
+        hero.swing_skill = 0;
+        hero.seq = {};
+        hero.smove = {};
+        hero.pmode = -1;
+        world.cues.due.clear();
+        std::printf("OK: Jab's dosound a on its %td event-3 frames\n", sound_frames);
+    }
     const auto poisoned = [&] { return std::ranges::any_of(hero.regen, &Fight::Regen::poison); };
     hero.regen.push_back({ -1.0, 0, 1000 * kTickMs, true });
     // A monster's curse on the player is a self state's aurastats: Weaken's

@@ -258,6 +258,7 @@ struct Fight {
         std::span<const d2d::rules::SeqFrame> seq{};
         std::uint32_t seq_frame_ms = 40;
         int seq_struck = 0;
+        int seq_sounded = 0;                   // its event-3 frames already past (Jab's dosound a)
         bool seq_loop = false;                 // Whirlwind's plays over until it arrives
         // A skill that moves the player (Whirlwind, Charge, Leap Attack):
         // toward (tx, ty) at `speed` cells/s while `on`; `fly` ignores walls
@@ -502,6 +503,7 @@ struct Fight {
     // ponytail: the sequence's rate taken as the class's A1 (animdata)
     // through attack_ticks; seqinput / seqtrans aren't read.
     void start_sequence(std::uint32_t now_ms);
+    [[nodiscard]] std::span<const d2d::rules::SeqFrame> skill_sequence() const;   // the swing skill's frames for the weapon, none for a plain mode
     // The movement a moving skill starts with (its srvstfunc):
     // Whirlwind (FUN_005d8f50) to the target at the class's walk velocity
     // (FUN_0056e5b0: CharStats +0x40), its sequence over and over;
@@ -514,7 +516,7 @@ struct Fight {
     // Where the frames stand: the frame index (looping or held on the
     // last) and how many event-1 frames have passed since the start.
     [[nodiscard]] std::size_t seq_at(std::uint32_t now_ms) const;
-    [[nodiscard]] int seq_events(std::uint32_t now_ms) const;
+    [[nodiscard]] int seq_events(std::uint32_t now_ms, int event = 1) const;   // the frames with `event` past
     // What the player shows in a sequence: its frame's mode, and a start
     // time that lands the renderer (frame = elapsed / ms_per_frame) on it.
     [[nodiscard]] std::pair<int, std::uint32_t> seq_view(std::uint32_t now_ms) const;
