@@ -106,15 +106,25 @@ int main(int argc, char** argv) try {
             monprop_hit(monster, foe, false);
             assert(foe.knocked_from.has_value() == ((expect.next() & 0x7f) < 0x40) && foe.crushed.empty());
         }
+        for (int k = 0; k < 8; ++k) {                          // a small monster always, a large one a quarter of the time
+            Foe small, large;
+            small.knock_under = 0x80; large.knock_under = 0x20;
+            monprop_hit(monster, small, false);
+            auto expect = monster.seed;
+            monprop_hit(monster, large, false);
+            assert(small.knocked_from && large.knocked_from.has_value() == ((expect.next() & 0x7f) < 0x20));
+        }
         monster.props.knock = 0; monster.props.crush = 100;    // always
         Foe player, confused;
-        confused.of = &monster;
+        confused.of = &monster; confused.crush_divisor = 4;    // monster_foe_props' for a plain monster
         monprop_hit(monster, player, false); monprop_hit(monster, player, true); monprop_hit(monster, confused, false);
         assert((player.crushed == std::vector{ 10, 20 }) && (confused.crushed == std::vector{ 4 }) && !player.knocked_from);
         monster.props.crush = 0;
         auto untouched = monster.seed;
         monprop_hit(monster, player, false);
         assert(monster.seed.low == untouched.low && player.crushed.size() == 2);   // no prop, no draw
+        // life / divisor, less the raw damageresist up to 100; none below 1 (FUN_005bffc0).
+        assert(crushing_blow(1000, 4, 0) == 250 && crushing_blow(1000, 4, 60) == 100 && crushing_blow(1000, 4, 150) == 0 && crushing_blow(1000, 4, -100) == 250);
         std::printf("OK: MonProp IAS / FCR rates, knock and crush rolls\n");
     }
     if (!fs::exists(data_dir / "d2data.mpq")) { std::printf("SKIP: no d2data.mpq in %s\n", data_dir.string().c_str()); return 0; }
@@ -122,6 +132,25 @@ int main(int argc, char** argv) try {
 
     auto data = load_game_data(data_dir, patch ? fs::path(patch) : fs::path{}, 0x1234);
     assert(data && data->town.id == 1 && !data->town.walk.empty());
+    {
+        // MonProp knock and crush on a monster foe (FUN_005bf960, FUN_005bffc0):
+        // MonStats2 small / large, a hireling's 10, a boss's or unique's 8, +50 % a player past one.
+        const auto row = [&](std::string_view id) { return int(data->monsters.by_id.at(std::string(id))); };
+        const auto props_of = [&](int type, d2d::rules::Boss boss, int players) {
+            Monster monster; monster.type = type; monster.boss = boss; monster.players = players;
+            Foe foe; monster_foe_props(*data, monster, foe);
+            return std::pair{ foe.knock_under, foe.crush_divisor };
+        };
+        const int zombie = row("zombie1"), quill = row("quillrat1");
+        assert(!data->monsters.types[std::size_t(zombie)].small && !data->monsters.types[std::size_t(zombie)].large);
+        assert(props_of(zombie, d2d::rules::Boss::none, 1) == std::pair(0x40, 4) && props_of(zombie, d2d::rules::Boss::champion, 1).second == 4);
+        assert(props_of(zombie, d2d::rules::Boss::unique, 1).second == 8 && props_of(zombie, d2d::rules::Boss::superunique, 3).second == 16);
+        assert(props_of(zombie, d2d::rules::Boss::none, 2).second == 6 && props_of(row("andariel"), d2d::rules::Boss::none, 1).second == 8);
+        assert(props_of(row("roguehire"), d2d::rules::Boss::none, 4).second == 10 && row("roguehire") == 0x10f);
+        assert(data->monsters.types[std::size_t(quill)].small == (props_of(quill, d2d::rules::Boss::none, 1).first == 0x80));
+        assert(std::ranges::any_of(data->monsters.types, &d2d::rules::MonType::large) && std::ranges::any_of(data->monsters.types, &d2d::rules::MonType::small));
+        std::printf("OK: MonProp knock and crush on monster foes\n");
+    }
     if (data->patched) {                                          // the 1.14d tables (the CD's may differ)
         // MonProp rows as game.exe compiled them (tools/monprop_rows.py: the
         // emulator's DataTables +0xc30), per MonStats row and difficulty;

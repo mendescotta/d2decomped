@@ -2548,6 +2548,7 @@ Monster make_monster(const GameData& game_data, int type, float x, float y, d2d:
     const auto& type_info = game_data.monsters.types[std::size_t(type)];
     Monster monster;
     monster.type = type;
+    monster.players = players;
     monster.killable = type_info.killable;
     // FUN_005b2a00: Align 1 good (stat 0xac 2), 2 neutral (1), else evil.
     monster.align = type_info.align == 1 ? 2 : type_info.align == 2 ? 1 : 0;

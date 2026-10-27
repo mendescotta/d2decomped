@@ -55,17 +55,32 @@ monster-ai.md.
     `game::monprop_hit`): swing2 / cast2 are IAS 93 / FCR 105 on its A1 /
     A2 and SC rates (`FUN_00623f50` → `FUN_00621740`, 120 × v / (120 +
     v)). Thorns (78, damagedinmelee func 6, `FUN_005bf670`) puts its flat
-    value on a melee striker as physical damage through `FUN_0057c6c0` →
-    `FUN_0057c1e0`, so its damage reduction applies. Knockback (81, func 7,
-    `FUN_005bf960`) is a seed draw's low 7 bits under 0x40 against a
-    player, result flag 8. Crushing blow (136, func 16, `FUN_005bffc0`) is
-    a seed draw % 100 under the value: current life / 10 for a player or a
-    pet (4 for a monster, 8 for a boss), doubled for the missile event,
-    less damage reduction %, after the hit. Stupidity (`FUN_005bfaa0`)
-    acts on monster targets only; fade is drawn by the client; fire
-    mastery reaches only missiles the monster owns, and the Council's and
-    baalhighpriest's fire comes from their Hydra's heads, so none of
-    those three acts.
+    value on a melee striker (unit +0xc4 bit 2) as physical damage through
+    `FUN_0057c6c0` → `FUN_0057c1e0`, so its damage reduction applies: the
+    player's swings and the merc's (`Fight::merc_strike`). Knockback (81,
+    func 7, `FUN_005bf960`) is a seed draw's low 7 bits under a bound,
+    result flag 8: 0x40 against a player or a plain monster, 0x20 for a
+    MonStats2 `large` one, 0x80 (always) a `small` one (byte +5 & 8 / & 4,
+    masks [0x6ce274] / [0x6ce270]; the column list at 0x6580a5 puts large
+    at flags bit 11, small at 10). Crushing blow (136, func 16,
+    `FUN_005bffc0`) is a seed draw % 100 under the value: current life
+    (stat 6) / a divisor, after the hit. The divisor: 10 for a player or a
+    hireling (`FUN_0063ee90`: classes 0x10f, 0x152, 0x167, 0x230, 0x231);
+    for another monster (a pet, or one made a foe by Confuse or Attract) 4,
+    8 for a MonStats boss (+0xc & 0x40, `FUN_0063e9f0`) or a unique (data
+    +0x16 & 2, `FUN_005a0180`), plus its monster_playercount share (stat
+    0x64, at least 1, through `FUN_005738f0`: the table at 0x6e1590, 0, 0,
+    50, 100 … %, then (n − 2) × 50); doubled for the missile event (6).
+    The share it takes off is the raw damageresist (stat 0x24), 100 at
+    most and none at 0 or less (`FUN_00483360`, × dr / 100), not a hit's
+    50 % cap. Life is set to the rest (0 at most: result flag 2), state
+    0x93 on when it took any. d2d: `Foe::knock_under` / `crush_divisor`
+    (`game::monster_foe_props`), `game::crushing_blow`; a monster foe
+    takes its crushes and knockback (`Fight::knock_back`) after the hits.
+    Stupidity (`FUN_005bfaa0`) acts on monster targets only; fade is
+    drawn by the client; fire mastery reaches only missiles the monster
+    owns, and the Council's and baalhighpriest's fire comes from their
+    Hydra's heads, so none of those three acts.
 
 ## Monster region — FUN_005479c0 / FUN_005475e0
 

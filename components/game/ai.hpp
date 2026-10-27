@@ -338,6 +338,7 @@ struct Monster {
     bool half_freeze = false;
     int variant = -1;                         // the knights' rand(4) as made (d2d::rules::monster_variant), -1 none
     d2d::rules::MonProps props;               // its MonProp row's (d2d::rules::monster_props)
+    int players = 1;                          // the players in the game as it was made (stat 0x64 monster_playercount)
     [[nodiscard]] bool alive() const { return hit_points > 0 && !gone; }
     [[nodiscard]] bool targetable() const { return alive() && killable && !buried && !aloft && !riding; }   // unit flags 0xe: not a buried maggot, a vulture aloft, a riding imp, an unkillable one
     // As a target for the player's (or the merc's) hits.
@@ -386,6 +387,8 @@ struct Foe {
     std::vector<int> fired_by;                // the owners of the ReturnFire missiles that reached it this frame (Chilling Armor)
     std::vector<int> shot_by;                 // the owners of the monster missiles that hit it this frame (their MonProp events)
     std::vector<int> crushed;                 // Crushing Blows this frame, each its life divisor (MonProp crush, FUN_005bffc0)
+    int knock_under = 0x40;                   // MonProp knock lands on a draw's low 7 bits under it (FUN_005bf960)
+    int crush_divisor = 10;                   // MonProp crush's life divisor, before a missile's doubling (FUN_005bffc0)
     int hits = 0;                             // hits that landed this frame (each wears its armour)
     bool running = false;                     // the player in RN: always hit by a swing, block a third
     [[nodiscard]] d2d::rules::Motion motion() const { return running ? d2d::rules::Motion::running : moving ? d2d::rules::Motion::walking : d2d::rules::Motion::standing; }
@@ -416,18 +419,43 @@ struct Foe {
 // event list +0x90; the melee event, or the missile one, 6, for its
 // missile's): each draws on the monster's seed.
 // - Knockback (stat 81, func 7, FUN_005bf960): a draw's low 7 bits under
-//   0x40 (half), result flag 8 from where the monster stands.
+//   the foe's `knock_under`, result flag 8 from where the monster stands.
 // - Crushing Blow (stat 136, func 16, FUN_005bffc0): a draw % 100 under
-//   the value; it takes current life / divisor, less its damage reduction
-//   %, after the hit: 10 for a player or a pet, 4 a monster, doubled for a
-//   missile.
-// ponytail: against a monster (Confuse) knock's 0x20 / 0x80 by its flags
-// (FUN_00451fe0) and crush's 8 for a boss (FUN_0063e9f0, FUN_005a0180)
-// aren't read.
+//   the value; it takes current life / the foe's `crush_divisor`, doubled
+//   for a missile, less its damageresist (crushing_blow), after the hit.
+// ponytail: a pet's or the merc's knockback (knocked_from) isn't played.
 inline void monprop_hit(Monster& monster, Foe& foe, bool missile) {
-    if (monster.props.knock > 0 && (monster.seed.next() & 0x7f) < 0x40) foe.knocked_from = std::pair{ monster.unit.x, monster.unit.y };
+    if (monster.props.knock > 0 && int(monster.seed.next() & 0x7f) < foe.knock_under) foe.knocked_from = std::pair{ monster.unit.x, monster.unit.y };
     if (monster.props.crush > 0 && int(monster.seed.next() % 100) < monster.props.crush)
-        foe.crushed.push_back((foe.of && !foe.pet ? 4 : 10) * (missile ? 2 : 1));
+        foe.crushed.push_back(foe.crush_divisor * (missile ? 2 : 1));
+}
+
+// What a Crushing Blow takes off `life` (FUN_005bffc0): life / divisor,
+// less its share of the raw damageresist (stat 0x24, 100 at most; none
+// when 0 or less), not the 50 % a hit's reduction stops at.
+inline std::int64_t crushing_blow(std::int64_t life, int divisor, int damage_resist) {
+    const std::int64_t crush = life / std::max(divisor, 1);
+    return crush - (damage_resist > 0 ? crush * std::min(damage_resist, 100) / 100 : 0);
+}
+
+// A monster unit (a pet, or a monster made a foe by Confuse or Attract) as
+// MonProp knock and crush see it. Knock: under 0x20 for a MonStats2 large
+// one, 0x80 (always) a small one (FUN_005bf960: MonStats2 +5 & 8 / & 4,
+// [0x6ce274] / [0x6ce270]). Crush: 10 for a hireling (FUN_0063ee90's
+// classes 0x10f, 0x152, 0x167, 0x230, 0x231); else 4, 8 for a MonStats boss
+// (+0xc & 0x40, FUN_0063e9f0) or a unique (data +0x16 & 2, FUN_005a0180),
+// raised by its monster_playercount share (FUN_005738f0: 0 for one
+// player, +50 % each after).
+inline void monster_foe_props(const GameData& game_data, const Monster& monster, Foe& foe) {
+    const auto& type_info = game_data.monsters.types[std::size_t(monster.type)];
+    foe.knock_under = type_info.large ? 0x20 : type_info.small ? 0x80 : 0x40;
+    if (monster.type == 0x10f || monster.type == 0x152 || monster.type == 0x167 || monster.type == 0x230 || monster.type == 0x231) { foe.crush_divisor = 10; return; }
+    const bool unique = monster.boss == d2d::rules::Boss::unique || monster.boss == d2d::rules::Boss::superunique;
+    int divisor = type_info.boss_column || unique ? 8 : 4;
+    const int players = std::max(monster.players, 1);
+    if (const int share = players < 9 ? std::array{ 0, 0, 50, 100, 150, 200, 250, 300, 350 }[std::size_t(players)] : (players - 2) * 50; share != 0)
+        divisor += divisor * share / 100;
+    foe.crush_divisor = divisor;
 }
 
 constexpr float kMeleeReach = 1.1f;           // cells between centres

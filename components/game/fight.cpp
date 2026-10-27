@@ -869,15 +869,18 @@ auto Fight::land(std::size_t monster_index, const d2d::rules::Blow& blow, bool b
         // frames on, 45 stunned): monster_update.
         // ponytail: an even slide over KB's length; the path's own pace
         // (FUN_00554ca0) isn't traced.
-        if (const bool has_kb = game_data->npc_timing(target.npc, "KB").directions > 0 && game_data->npc_timing(target.npc, "GH").directions > 0; blow.knockback && has_kb) {
-            const float reach = game_data->monsters.types[std::size_t(target.type)].base == 0x4e ? 2.f : 1.f;
-            const float dx = target.unit.x - actor->player.x, dy = target.unit.y - actor->player.y, distance = std::max(std::hypot(dx, dy), 0.01f);
-            const float next_x = target.unit.x + dx / distance * reach, next_y = target.unit.y + dy / distance * reach;
-            if (!level->unit_blocked(next_x, next_y, target.unit.shape)) {
-                target.leap_from_x = target.unit.x; target.leap_from_y = target.unit.y; target.leap_to_x = next_x; target.leap_to_y = next_y;
-                target.leaping = false;
-                set_mode(*game_data, target, "KB", now_ms);
-            }
+        if (blow.knockback) knock_back(target, actor->player.x, actor->player.y, now_ms);
+    }
+
+auto Fight::knock_back(Monster& target, float from_x, float from_y, std::uint32_t now_ms) -> void {
+        if (game_data->npc_timing(target.npc, "KB").directions <= 0 || game_data->npc_timing(target.npc, "GH").directions <= 0) return;
+        const float reach = game_data->monsters.types[std::size_t(target.type)].base == 0x4e ? 2.f : 1.f;
+        const float dx = target.unit.x - from_x, dy = target.unit.y - from_y, distance = std::max(std::hypot(dx, dy), 0.01f);
+        const float next_x = target.unit.x + dx / distance * reach, next_y = target.unit.y + dy / distance * reach;
+        if (!level->unit_blocked(next_x, next_y, target.unit.shape)) {
+            target.leap_from_x = target.unit.x; target.leap_from_y = target.unit.y; target.leap_to_x = next_x; target.leap_to_y = next_y;
+            target.leaping = false;
+            set_mode(*game_data, target, "KB", now_ms);
         }
     }
 
@@ -952,7 +955,6 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         // FUN_005bf670): its flat value back on a melee striker as physical
         // damage, through the striker's damage reduction (FUN_0057c6c0 ->
         // FUN_0057c1e0, as a monster's blow).
-        // ponytail: the merc's swings (merc_fight) take none.
         if (const int thorns = target_monster.props.thorns; blow.hit && thorns > 0)
             actor->self_hurt += std::int64_t(std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0)) << 8;
         if (blow.hit && charging) charge(*skill, now_ms);
@@ -1803,6 +1805,16 @@ auto Fight::gain_exp(std::int64_t share, const Monster& monster, std::uint32_t n
         }
     }
 
+auto Fight::merc_strike(std::size_t target, const d2d::rules::Swing& swing, std::uint32_t now_ms) -> void {
+        const auto fighter = merc_fighter();
+        const int thorns = monsters[target].props.thorns;
+        const auto blow = d2d::rules::player_blow(fighter, target_of(target), actor->merc_st.level, rng, swing);
+        land(target, blow, false, now_ms);
+        // A MonProp thorns monster's flat value back on the merc, a melee
+        // striker as the player is (FUN_005bf670), through its damage reduction.
+        if (blow.hit && thorns > 0) actor->merc_hurt += std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0);
+    }
+
 auto Fight::merc_fighter() const -> d2d::rules::Fighter {
         using namespace d2d::d2s;
         // Its stats as a unit's (FUN_00572840's base, its worn items'
@@ -2001,7 +2013,7 @@ auto Fight::merc_turn(std::uint32_t now_ms, float elapsed, const Crowd& crowd, b
                 const auto* skill = actor->merc_skill >= 0 ? game_data->skills.get(actor->merc_skill) : nullptr;
                 if (target.alive() && std::hypot(target.unit.x - unit.x, target.unit.y - unit.y) <= kMeleeReach + 0.3f) {
                     const auto swing_with = skill ? skill_swing(*skill, std::max(actor->merc_skill_level, 1), merc_calc_env(), false) : d2d::rules::Swing{};
-                    land(std::size_t(actor->merc_target), d2d::rules::player_blow(merc_fighter(), target_of(std::size_t(actor->merc_target)), actor->merc_st.level, rng, swing_with), false, now_ms);
+                    merc_strike(std::size_t(actor->merc_target), swing_with, now_ms);
                 }
             }
             if (now_ms < actor->merc->mode_until) return;
@@ -2036,7 +2048,7 @@ auto Fight::merc_turn(std::uint32_t now_ms, float elapsed, const Crowd& crowd, b
                     // player's do (skill_swing) at the merc's skill level.
                     // ponytail: Jab's SQ hits come as one.
                     const auto swing_with = skill ? skill_swing(*skill, std::max(actor->merc_skill_level, 1), merc_calc_env(), false) : d2d::rules::Swing{};
-                    land(std::size_t(actor->merc_target), d2d::rules::player_blow(merc_fighter(), target_of(std::size_t(actor->merc_target)), actor->merc_st.level, rng, swing_with), false, now_ms);
+                    merc_strike(std::size_t(actor->merc_target), swing_with, now_ms);
                 }
                 }
             }
@@ -3373,6 +3385,7 @@ auto Fight::pet_foe(const Pet& pet) const -> Foe {
         Foe foe{ pet.monster.unit.x, pet.monster.unit.y, pet.monster.stats.level, pet.monster.alive() && pet.monster.mode != "DT" && pet.shot_skill < 0 && !still && pet.where == level,
                  pet.monster.unit.walking, fighter };
         foe.pet = true; foe.size = type_info.size; foe.threat = type_info.threat; foe.id = pet.monster.id;
+        monster_foe_props(*game_data, pet.monster, foe);
         foe.life_pct = int(std::int64_t(pet.monster.hit_points) * 100 / std::max(pet.monster.stats.hit_points, 1));
         const auto& own = type_info.diff[std::size_t(pet.monster.difficulty)].res;
         std::array<int, 5> res{ own[0], own[1] };
@@ -4344,8 +4357,11 @@ auto Fight::merc_foe(std::uint32_t now_ms) -> Foe {
         foe.pet = true;                                  // the merc: its MonStats class's size
         foe.id = -3 - 2 * actor->id;                     // as the player's, its own
         foe.life_pct = actor->merc ? int(std::int64_t(actor->merc->hit_points) * 100 / std::max(merc_max_life(), 1)) : 0;
-        if (const int row = actor->merc_npc ? game_data->monsters.row(actor->merc_npc->id) : -1; row >= 0)
-            foe.size = game_data->monsters.types[std::size_t(row)].size, foe.threat = game_data->monsters.types[std::size_t(row)].threat;
+        if (const int row = actor->merc_npc ? game_data->monsters.row(actor->merc_npc->id) : -1; row >= 0) {
+            const auto& type_info = game_data->monsters.types[std::size_t(row)];
+            foe.size = type_info.size; foe.threat = type_info.threat;
+            foe.knock_under = type_info.large ? 0x20 : type_info.small ? 0x80 : 0x40;   // as a monster's (monster_foe_props); crush a hireling's 10
+        }
         // The merc's curse: its damageresist (Amplify Damage's -100 %).
         // ponytail: its other aurastats (Weaken's damagepercent) aren't on the merc's fighter.
         int curse_dr = 0;
@@ -4425,6 +4441,7 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
                     const auto& type_info = game_data->monsters.types[std::size_t(monster.type)];
                     Foe& foe = foes.emplace_back(Foe{ monster.unit.x, monster.unit.y, monster.stats.level, monster.targetable() && monster.mode != "DT", monster.unit.walking, fighter });
                     foe.size = type_info.size; foe.threat = type_info.threat; foe.of = &monster; foe.id = monster.id;
+                    monster_foe_props(*game_data, monster, foe);
                     foe.pick = unit_pick(*game_data, { target.res[0], target.res[1], target.res[2], target.res[3], target.res[4] }, monster.aura, monster.aura_lvl,
                                          d2d::rules::swing_max_damage(monster.stats, monster.swing_mode));
                     foe.pick.state_b = now_ms < monster.chill_until;   // state 0xb, cold
@@ -4438,9 +4455,19 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
                     killed(i, now_ms);                           // on a player's thorns
             }
             const auto cursed = [&](const Monster& monster) { return monster.curse.skill >= 0 && now_ms < monster.curse.until; };
-            for (std::size_t i = allies; i < foes.size(); ++i)
-                if (const auto monster_index = i - allies; hurt(*game_data, monsters[monster_index], soak(monsters[monster_index], foes[i].physical, foes[i].damage), now_ms))
-                    killed(monster_index, now_ms, cursed(monsters[monster_index]) || std::ranges::any_of(foes[i].melee_by, [&](int striker) { const int at_index = this->monster_index(striker); return at_index >= 0 && cursed(monsters[std::size_t(at_index)]); }));
+            for (std::size_t i = allies; i < foes.size(); ++i) {
+                const auto monster_index = i - allies;
+                auto& struck = monsters[monster_index];
+                const bool was_alive = struck.alive();
+                bool dead = hurt(*game_data, struck, soak(struck, foes[i].physical, foes[i].damage), now_ms);
+                // Its Crushing Blows after the hits, less its own damageresist
+                // (FUN_005bffc0), and a knockback as the player's (knock_back).
+                for (const int divisor : foes[i].crushed)
+                    if (!dead && struck.alive()) dead = hurt(*game_data, struck, int(crushing_blow(struck.hit_points, divisor, struck.target(*game_data).res[0])), now_ms);
+                if (!dead && was_alive && struck.alive() && foes[i].knocked_from) knock_back(struck, foes[i].knocked_from->first, foes[i].knocked_from->second, now_ms);
+                if (dead)
+                    killed(monster_index, now_ms, cursed(struck) || std::ranges::any_of(foes[i].melee_by, [&](int striker) { const int at_index = this->monster_index(striker); return at_index >= 0 && cursed(monsters[std::size_t(at_index)]); }));
+            }
             for (const auto& side : sides)
                 if (foes[side.at].blessed) side.hero->wisp_blessing = { foes[side.at].blessed, now_ms + 0x1a5e00u * 40 };   // FUN_006251f0: 0x1a5e00 frames
             // Impregnate's state off at a death (FUN_005d21b0): the skill's summon
@@ -4470,7 +4497,13 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
                 buff_tick(now_ms);
                 aura_pulse(now_ms);
                 for (auto& monster : monsters) monster.in_aura = monster.in_aura || (monster.alive() && in_aura(monster));   // its auratargetstate shows (states.md)
-                for (std::size_t k = 0; k < actor->pets.size(); ++k) pet_hurt(actor->pets[k], foes[side.pets + k].damage, now_ms);
+                for (std::size_t k = 0; k < actor->pets.size(); ++k) {
+                    auto& pet = actor->pets[k];
+                    const auto& foe = foes[side.pets + k];
+                    pet_hurt(pet, foe.damage, now_ms);
+                    for (const int divisor : foe.crushed)                // Crushing Blows, after the hits (FUN_005bffc0)
+                        if (pet.monster.alive()) pet_hurt(pet, int(crushing_blow(pet.monster.hit_points, divisor, foe.pick.damage_resist)), now_ms);
+                }
                 pets_turn(now_ms, elapsed, crowd);
                 player_shots(now_ms);
             }
@@ -4558,10 +4591,10 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
 // this frame: the merc's life and flinch, then the player's poison, chill,
 // stun, knockback, curses, Mana Burn, block, armour wear and life.
 auto Fight::hurt_side(std::span<Foe> side, std::uint32_t now_ms) -> void {
+        side[1].damage += std::exchange(actor->merc_hurt, 0);      // its swings' thorns (merc_strike)
         if (actor->merc && actor->merc->mode != "DT")           // Crushing Blows, after the hits (monprop_hit)
             for (const int divisor : side[1].crushed) {
-                const int crush = std::max(actor->merc->hit_points - side[1].damage, 0) / divisor;
-                side[1].damage += std::max(crush - crush * side[1].fighter.dr_pct / 100, 0);
+                side[1].damage += int(crushing_blow(std::max(actor->merc->hit_points - side[1].damage, 0), divisor, side[1].pick.damage_resist));
             }
         if (actor->merc && side[1].damage > 0 && actor->merc->mode != "DT") {
             actor->merc->hit_points -= side[1].damage;
@@ -4656,12 +4689,12 @@ auto Fight::hurt_side(std::span<Foe> side, std::uint32_t now_ms) -> void {
             actor->character.stats.values[kLife] -= std::int64_t(foe.damage) << 8;
             if (actor->character.stats.values[kLife] <= 0) { die(now_ms); died = true; }
         }
-        for (const int divisor : foe.crushed) {             // Crushing Blows, after the hits: life / divisor less DR % (FUN_005bffc0)
+        for (const int divisor : foe.crushed) {             // Crushing Blows, after the hits (crushing_blow, FUN_005bffc0)
             if (died || dead()) break;
             auto& life = actor->character.stats.values[kLife];
-            const std::int64_t crush = life / divisor;
-            life = std::max<std::int64_t>(life - (crush - crush * foe.fighter.dr_pct / 100), 0);
-            d2d::log::info("crushing blow: -{} life", (crush - crush * foe.fighter.dr_pct / 100) >> 8);
+            const std::int64_t crush = crushing_blow(life, divisor, foe.pick.damage_resist);
+            life = std::max<std::int64_t>(life - crush, 0);
+            d2d::log::info("crushing blow: -{} life", crush >> 8);
             if (life <= 0) { die(now_ms); died = true; }
         }
         // Stunned, every landed hit is a get-hit, however small, even one
