@@ -25,6 +25,7 @@
 #include <rules.hpp>
 #include <skill_text.hpp>
 #include <skills.hpp>
+#include <uniques.hpp>
 #include <world.hpp>
 
 #include <algorithm>
