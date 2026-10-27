@@ -128,6 +128,10 @@ uv run python diff_drlg.py 1-20 2 drops         # then three items dropped at ea
 ./sweep.sh 1-50 monsters objgroups              # every level 2..39, a job per core but two (JOBS=n); progress on stderr
 ```
 
+- `monprop_rows.py`: the MonProp rows as game.exe compiled them
+  (DataTables +0xc30), per row its MonStats users and each difficulty's
+  {prop, par, min, max, chance} slots; test_game's MonProp cases are its
+  output.
 - `sight.py`: a monster's line of sight (FUN_00622920 → FUN_0064e260)
   on random walls in a fake room, against a line-for-line Python copy of
   `rules::sight_blocked`. `uv run python sight.py 20000 3` should print
