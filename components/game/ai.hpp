@@ -369,6 +369,7 @@ struct Foe {
     std::vector<int> melee_by, damaged_by;
     std::vector<int> fired_by;                // the owners of the ReturnFire missiles that reached it this frame (Chilling Armor)
     int hits = 0;                             // hits that landed this frame (each wears its armour)
+    int shot_class = 0;                       // a missile's that landed this frame: its Missiles.txt HitClass
     bool running = false;                     // the player in RN: always hit by a swing, block a third
     [[nodiscard]] d2d::rules::Motion motion() const { return running ? d2d::rules::Motion::running : moving ? d2d::rules::Motion::walking : d2d::rules::Motion::standing; }
     int mana_burn = 0;                        // mana it lost to Mana Burn this frame
@@ -676,7 +677,9 @@ void missiles_update(const Level& level, std::vector<Missile>& ms_, std::span<Fo
             const int key = -100 - int(&foe - foes.data());         // a ring's missiles strike each foe once
             if (std::ranges::contains(*missile.struck, key)) continue;
             missile.struck->push_back(key);
-            foe.take(d2d::rules::monster_blow(foe.fighter, foe.level, foe.motion(), missile.src, true, rng, true));
+            const auto taken = d2d::rules::monster_blow(foe.fighter, foe.level, foe.motion(), missile.src, true, rng, true);
+            foe.take(taken);
+            if (taken.hit && missile.info) foe.shot_class = missile.info->hit_class;
             if (missile.info && missile.info->hit_func == 19 && missile.skill >= 0) foe.marked = { missile.skill, missile.level };   // FUN_005ab110
             if (missile.info && missile.info->return_fire && missile.owner >= 0) foe.fired_by.push_back(missile.owner);
             return true;
