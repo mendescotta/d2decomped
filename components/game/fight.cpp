@@ -421,12 +421,21 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             const auto impact = d2d::rules::sound_ids::impact(actor->struck_class, mode == kModeDT);
             cues.cue(impact.impact, now_ms, actor->player.x, actor->player.y);
             cues.cue(impact.element, now_ms, actor->player.x, actor->player.y);
+            if (mode == kModeGH) actor->shown_class = actor->struck_class;
             actor->struck_class = 0;
             if (const int cls = actor->character.character_class; cls >= 0 && cls < 7) {
                 const auto& voice = d2d::rules::sound_ids::kPlayerVoice[std::size_t(cls)];
                 cues.cue(mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y);
             }
         }
+        // A block (FUN_004cb860): by the hit class the client last had (unit +0xb0), the
+        // last get-hit's. A blocked hit clears its flag 1 (FUN_0057ec10), so FUN_0057cee0
+        // keeps the old class and no hit packet (S→C 0x0c) carries a new one.
+        if (mode == kModeBL)
+            cues.cue(d2d::rules::sound_ids::block(actor->shown_class), now_ms, actor->player.x, actor->player.y);
+        // A kick (FUN_004cc5b0's KK): weapon_kick, an Assassin's 4 ticks on.
+        if (mode == kModeKK)
+            cues.cue(d2d::rules::sound_ids::kKick, now_ms + (actor->character.character_class == d2d::d2s::kAssassin ? 4 * 40 : 0), actor->player.x, actor->player.y);
         // A skill starting (FUN_004c6140): its stsound (its ItemCastSound from an item), the
         // weapon's swing for weaponsnd, and the class's own stsoundclass; stsounddelay holds
         // them back the swing's frames less 3 ticks (FUN_004ca500).
@@ -4680,9 +4689,9 @@ auto Fight::hurt_side(std::span<Foe> side, std::uint32_t now_ms) -> void {
         }
         if (foe.blocked && actor->pmode < 0) set_pmode(kModeBL, now_ms);   // a block plays out (FBR)
         for (int landed = 0; landed < foe.hits; ++landed) wear_armor(now_ms);
-        if (foe.hits > 0) {                                         // a monster's MonStats2 HitClass; a missile's none here
+        if (foe.hits > 0) {                                         // a monster's MonStats2 HitClass, else a missile's Missiles.txt one
             const int striker = foe.melee_by.empty() ? -1 : monster_index(foe.melee_by.back());
-            actor->struck_class = striker < 0 || monsters[std::size_t(striker)].type < 0 ? 0 : game_data->monsters.types[std::size_t(monsters[std::size_t(striker)].type)].hit_class;
+            actor->struck_class = striker < 0 || monsters[std::size_t(striker)].type < 0 ? foe.shot_class : game_data->monsters.types[std::size_t(monsters[std::size_t(striker)].type)].hit_class;
         }
         foe.damage = absorb(foe, now_ms);
         foe.damage += int(actor->self_hurt >> 8);
