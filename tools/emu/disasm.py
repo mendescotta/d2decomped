@@ -44,7 +44,7 @@ def main():
     va = int(args[0], 16)
     count = int(args[1]) if len(args) > 1 else None
     image = pe.get_memory_mapped_image()
-    for done, ins in enumerate(md.disasm(image[va - base:va - base + 0x4000], va), 1):
+    for done, ins in enumerate(md.disasm(image[va - base:], va), 1):   # stops at the image's end or a byte it can't decode
         print(f"{ins.address:08x}  {ins.mnemonic:7} {ins.op_str}")
         if (count and done >= count) or (not count and ins.mnemonic.startswith("ret")):
             break
