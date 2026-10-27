@@ -250,6 +250,7 @@ struct Fight {
         bool  item_cast = false;              // swing_skill is cast from an item (a scroll): its ItemCastSound
         int   struck_class = 0;               // the last hit on the player's hit class (unit +0xb0): its impact on GH / DT
         std::int64_t self_hurt = 0;            // life (256ths) the player's own skills cost (Sacrifice), taken with the monsters' hits
+        int merc_hurt = 0;                     // life the merc's swings cost it (a MonProp thorns monster's), taken with the monsters' hits
         // An SQ skill's sequence while it plays (sequences.hpp, for the weapon
         // class): its frames, each seq_frame_ms long, and the hits (event 1)
         // already struck.
@@ -537,6 +538,9 @@ struct Fight {
     // otherwise the damage, life/mana leech (the player's), poison and
     // bleeding over time, a chill, a knockback. A kill counts.
     void land(std::size_t monster_index, const d2d::rules::Blow& blow, bool by_player, std::uint32_t now_ms);
+    void merc_strike(std::size_t target, const d2d::rules::Swing& swing, std::uint32_t now_ms);   // the merc's melee blow on a monster, and its thorns back
+    // A monster with GH and KB modes knocked back away from (from_x, from_y): land's knockback, a monster foe's (Smite, MonProp knock).
+    void knock_back(Monster& target, float from_x, float from_y, std::uint32_t now_ms);
 
     // Poison and bleeding tick on the monsters near the player.
     void monster_dots(std::uint32_t now_ms, float elapsed);

@@ -300,6 +300,48 @@ inline int player_exp_pct(int players) {
     return players < 9 ? kPct[std::size_t(std::max(players, 0))] : (players * 5 + 130) * 2;
 }
 
+// What a monster's MonProp row gave it (the end of FUN_00573cb0): each
+// slot of its difficulty in order, one with a chance first stepping the
+// unit seed and applying when its low % 100 is below it; applying is the
+// item property path (FUN_0065fd70 -> apply_mod), whose min..max draw is
+// on the unit seed too (FUN_0065e9e0, a monster's +0x20). The stats as
+// they act on a monster:
+// - ias / fcr: its attack (A1, A2) and cast (SC) rates (FUN_00623f50 ->
+//   FUN_00621740: 120 x v / (120 + v), anim_rate_pct);
+// - crush / knock (domeleedamage / domissiledamage events 16 / 7) and
+//   thorns (damagedinmelee 6): the item events FUN_0055b800 hooks up, as
+//   FUN_00573cb0 sets it as the monster's stat callback before the row;
+// - stupidity (event 9, FUN_005bfaa0) blinds only a monster it hits, and
+//   the one row with it, druidhawk, is the Druid's Raven; fade (stat 181)
+//   is how the client draws it; fire mastery reaches only fire missiles
+//   the monster owns itself (FUN_0064b860 -> FUN_00644c90), and the
+//   Council and baalhighpriest fire only through their Hydra's heads
+//   (FUN_005ca910, the heads owning the missiles): kept, none of them acts.
+struct MonProps { int ias = 0, fcr = 0, crush = 0, knock = 0, thorns = 0, stupidity = 0, fire_mastery = 0, fade = 0; };
+inline MonProps monster_props(const Tables& tables, const MonType& type, int difficulty, Rng& unit_seed) {
+    MonProps props;
+    for (const auto& slot : type.props[std::size_t(std::clamp(difficulty, 0, 2))]) {
+        if (slot.chance != 0 && int(unit_seed.next() % 100) >= slot.chance) continue;
+        std::vector<d2d::d2s::ItemProp> stats;
+        apply_mod(tables, { slot.code, slot.param, slot.min, slot.max }, stats, unit_seed);
+        for (const auto& stat : stats) {
+            using namespace d2d::d2s;
+            switch (stat.stat) {
+                case kFasterAttackRate: props.ias += stat.value; break;
+                case kFasterCastRate: props.fcr += stat.value; break;
+                case kCrushingBlow: props.crush += stat.value; break;
+                case kKnockback: props.knock += stat.value; break;
+                case kAttackerTakesDamage: props.thorns += stat.value; break;
+                case kStupidity: props.stupidity += stat.value; break;
+                case kPassiveFireMastery: props.fire_mastery += stat.value; break;
+                case kFade: props.fade += stat.value; break;
+                default: break;
+            }
+        }
+    }
+    return props;
+}
+
 // FUN_006538a0's values before monster_stats' roll, at the type's own
 // Level: life min / max, A1 min / max (the skill tooltips' summon lines,
 // game::skill_text).

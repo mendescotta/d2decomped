@@ -91,11 +91,107 @@ int main(int argc, char** argv) try {
         assert(received.quest_log == sent.quest_log);
         assert(received.game_quests == sent.game_quests);
     }
+    {
+        // MonProp's stats on a monster: IAS on A1 / A2, FCR on SC (120 x v /
+        // (120 + v)); knock and crush on its seed (FUN_005bf960, FUN_005bffc0).
+        Monster monster;
+        monster.props.ias = 30; monster.props.fcr = 15; monster.anim_pct = 10;
+        assert(anim_rate_pct(monster, "A1") == 34 && anim_rate_pct(monster, "A2") == 34);
+        assert(anim_rate_pct(monster, "SC") == 23 && anim_rate_pct(monster, "WL") == 10 && anim_rate_pct(monster, "S1") == 10);
+        monster.seed = d2d::rules::Rng(77);
+        monster.props.knock = 1;
+        for (int k = 0; k < 8; ++k) {
+            Foe foe;
+            auto expect = monster.seed;
+            monprop_hit(monster, foe, false);
+            assert(foe.knocked_from.has_value() == ((expect.next() & 0x7f) < 0x40) && foe.crushed.empty());
+        }
+        for (int k = 0; k < 8; ++k) {                          // a small monster always, a large one a quarter of the time
+            Foe small, large;
+            small.knock_under = 0x80; large.knock_under = 0x20;
+            monprop_hit(monster, small, false);
+            auto expect = monster.seed;
+            monprop_hit(monster, large, false);
+            assert(small.knocked_from && large.knocked_from.has_value() == ((expect.next() & 0x7f) < 0x20));
+        }
+        monster.props.knock = 0; monster.props.crush = 100;    // always
+        Foe player, confused;
+        confused.of = &monster; confused.crush_divisor = 4;    // monster_foe_props' for a plain monster
+        monprop_hit(monster, player, false); monprop_hit(monster, player, true); monprop_hit(monster, confused, false);
+        assert((player.crushed == std::vector{ 10, 20 }) && (confused.crushed == std::vector{ 4 }) && !player.knocked_from);
+        monster.props.crush = 0;
+        auto untouched = monster.seed;
+        monprop_hit(monster, player, false);
+        assert(monster.seed.low == untouched.low && player.crushed.size() == 2);   // no prop, no draw
+        // life / divisor, less the raw damageresist up to 100; none below 1 (FUN_005bffc0).
+        assert(crushing_blow(1000, 4, 0) == 250 && crushing_blow(1000, 4, 60) == 100 && crushing_blow(1000, 4, 150) == 0 && crushing_blow(1000, 4, -100) == 250);
+        std::printf("OK: MonProp IAS / FCR rates, knock and crush rolls\n");
+    }
     if (!fs::exists(data_dir / "d2data.mpq")) { std::printf("SKIP: no d2data.mpq in %s\n", data_dir.string().c_str()); return 0; }
     const char* patch = std::getenv("D2_PATCH_INSTALLER");
 
     auto data = load_game_data(data_dir, patch ? fs::path(patch) : fs::path{}, 0x1234);
     assert(data && data->town.id == 1 && !data->town.walk.empty());
+    {
+        // MonProp knock and crush on a monster foe (FUN_005bf960, FUN_005bffc0):
+        // MonStats2 small / large, a hireling's 10, a boss's or unique's 8, +50 % a player past one.
+        const auto row = [&](std::string_view id) { return int(data->monsters.by_id.at(std::string(id))); };
+        const auto props_of = [&](int type, d2d::rules::Boss boss, int players) {
+            Monster monster; monster.type = type; monster.boss = boss; monster.players = players;
+            Foe foe; monster_foe_props(*data, monster, foe);
+            return std::pair{ foe.knock_under, foe.crush_divisor };
+        };
+        const int zombie = row("zombie1"), quill = row("quillrat1");
+        assert(!data->monsters.types[std::size_t(zombie)].small && !data->monsters.types[std::size_t(zombie)].large);
+        assert(props_of(zombie, d2d::rules::Boss::none, 1) == std::pair(0x40, 4) && props_of(zombie, d2d::rules::Boss::champion, 1).second == 4);
+        assert(props_of(zombie, d2d::rules::Boss::unique, 1).second == 8 && props_of(zombie, d2d::rules::Boss::superunique, 3).second == 16);
+        assert(props_of(zombie, d2d::rules::Boss::none, 2).second == 6 && props_of(row("andariel"), d2d::rules::Boss::none, 1).second == 8);
+        assert(props_of(row("roguehire"), d2d::rules::Boss::none, 4).second == 10 && row("roguehire") == 0x10f);
+        assert(data->monsters.types[std::size_t(quill)].small == (props_of(quill, d2d::rules::Boss::none, 1).first == 0x80));
+        assert(std::ranges::any_of(data->monsters.types, &d2d::rules::MonType::large) && std::ranges::any_of(data->monsters.types, &d2d::rules::MonType::small));
+        std::printf("OK: MonProp knock and crush on monster foes\n");
+    }
+    if (data->patched) {                                          // the 1.14d tables (the CD's may differ)
+        // MonProp rows as game.exe compiled them (tools/monprop_rows.py: the
+        // emulator's DataTables +0xc30), per MonStats row and difficulty;
+        // every other row has none.
+        struct Case { int row, difficulty; std::string_view code; int min, max; };
+        static constexpr Case kCases[] = {
+            { 295, 0, "fade", 1, 1 }, { 295, 1, "fade", 2, 2 }, { 295, 2, "fade", 2, 2 },
+            { 242, 1, "cast2", 15, 15 }, { 242, 1, "swing2", 15, 15 }, { 242, 2, "cast2", 30, 30 }, { 242, 2, "swing2", 30, 30 },
+            { 704, 1, "cast2", 15, 15 }, { 704, 1, "swing2", 15, 15 }, { 704, 2, "cast2", 30, 30 }, { 704, 2, "swing2", 30, 30 },
+            { 186, 1, "crush", 15, 15 }, { 186, 2, "crush", 25, 25 }, { 187, 1, "crush", 15, 15 }, { 187, 2, "crush", 25, 25 },
+            { 188, 1, "crush", 15, 15 }, { 188, 2, "crush", 25, 25 }, { 189, 1, "crush", 15, 15 }, { 189, 2, "crush", 25, 25 },
+            { 618, 1, "crush", 15, 15 }, { 618, 2, "crush", 25, 25 }, { 619, 1, "crush", 15, 15 }, { 619, 2, "crush", 25, 25 },
+            { 345, 1, "extra-fire", 40, 40 }, { 345, 2, "extra-fire", 100, 100 }, { 346, 1, "extra-fire", 40, 40 }, { 346, 2, "extra-fire", 100, 100 },
+            { 347, 1, "extra-fire", 40, 40 }, { 347, 2, "extra-fire", 100, 100 }, { 557, 1, "extra-fire", 60, 60 }, { 557, 2, "extra-fire", 120, 120 },
+            { 267, 2, "knock", 1, 1 },
+            { 605, 1, "thorns", 15, 20 }, { 605, 2, "thorns", 30, 40 }, { 606, 1, "thorns", 15, 20 }, { 606, 2, "thorns", 30, 40 },
+            { 607, 1, "thorns", 15, 20 }, { 607, 2, "thorns", 30, 40 },
+            { 419, 0, "stupidity", -1, -1 }, { 419, 1, "stupidity", -1, -1 }, { 419, 2, "stupidity", -1, -1 },
+        };
+        std::size_t slots = 0;
+        for (const auto& type : data->monsters.types)
+            for (const auto& per_difficulty : type.props) slots += per_difficulty.size();
+        assert(slots == std::size(kCases));
+        std::array<std::array<std::size_t, 3>, 800> seen{};
+        for (const auto& c : kCases) {
+            const auto& slot = data->monsters.types.at(std::size_t(c.row)).props[std::size_t(c.difficulty)].at(seen[std::size_t(c.row)][std::size_t(c.difficulty)]++);
+            assert(slot.code == c.code && slot.min == c.min && slot.max == c.max && slot.chance == 0);
+        }
+        // What they come to: Mephisto's Hell IAS and FCR, a Hell quill rat's
+        // thorns drawn on its seed, Blunderbore's crush.
+        d2d::rules::Rng seed(1234);
+        const auto mephisto = d2d::rules::monster_props(data->rules, data->monsters.types[242], 2, seed);
+        assert(mephisto.ias == 30 && mephisto.fcr == 30 && seed.low == 1234);       // min == max: no draw
+        auto drawn = seed;
+        const auto quill = d2d::rules::monster_props(data->rules, data->monsters.types[607], 2, seed);
+        assert(quill.thorns == drawn.range(30, 40) && quill.thorns >= 30 && quill.thorns <= 40);
+        assert(d2d::rules::monster_props(data->rules, data->monsters.types[189], 2, seed).crush == 25);
+        assert(d2d::rules::monster_props(data->rules, data->monsters.types[267], 1, seed).knock == 0);
+        assert(d2d::rules::monster_props(data->rules, data->monsters.types[267], 2, seed).knock == 1);
+        std::printf("OK: MonProp rows match game.exe's (%zu slots)\n", slots);
+    }
     // `--skill-tips N [difficulty]`: every SkillDesc line at levels 1..N with
     // no unit, as tools/emu/skill_tips.py prints game.exe's (FUN_004edea0).
     if (argc > 2 && std::string_view(argv[1]) == "--skill-tips") {

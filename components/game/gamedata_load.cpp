@@ -155,6 +155,8 @@ void load_monsters(GameData& game_data, const d2d::mpq::Stack& mpqs) {
         }
     }
     const auto ms2_rows = id_rows(ms2);
+    const auto monprop = txt("MonProp");
+    const auto monprop_rows = id_rows(monprop);
     auto num = [](std::string_view text) { return std::atoi(std::string(text).c_str()); };
     auto& monsters = game_data.monsters;
     // An Id names the row at its place among the distinct Ids, as game.exe's
@@ -200,6 +202,15 @@ void load_monsters(GameData& game_data, const d2d::mpq::Stack& mpqs) {
         type_info.usound = text("UMonSound");
         type_info.threat = num(text("threat")); type_info.switch_ai = text("switchai") == "1"; type_info.interact = text("interact") == "1";
         type_info.montype = text("MonType");
+        if (const auto found = monprop_rows.find(std::string(text("MonProp"))); found != monprop_rows.end())
+            for (int difficulty = 0; difficulty < 3; ++difficulty)
+                for (int slot = 1; slot <= 6; ++slot) {
+                    const std::string x = std::to_string(slot) + (difficulty ? std::string(" ") + kSfx[difficulty] : std::string());
+                    auto column = [&](const char* name) { return monprop.get(found->second, name + x); };
+                    if (column("prop").empty()) break;                    // FUN_00573cb0 stops at the first prop below 0
+                    type_info.props[std::size_t(difficulty)].push_back({ std::string(column("prop")), std::string(column("par")),
+                                                                         num(column("min")), num(column("max")), num(column("chance")) });
+                }
         for (int difficulty = 0; difficulty < 3; ++difficulty) {
             const std::string x = kSfx[difficulty];
             auto& per_difficulty = type_info.diff[std::size_t(difficulty)];
@@ -230,6 +241,7 @@ void load_monsters(GameData& game_data, const d2d::mpq::Stack& mpqs) {
             type_info.base_w = ms2.get(monstats2_row, "BaseW");
             type_info.can_block = ms2.get(monstats2_row, "mBL") == "1";
             type_info.critter = ms2.get(monstats2_row, "critter") == "1";
+            type_info.small = ms2.get(monstats2_row, "small") == "1"; type_info.large = ms2.get(monstats2_row, "large") == "1";
             type_info.hit_class = num(ms2.get(monstats2_row, "HitClass"));
             type_info.pieces = num(ms2.get(monstats2_row, "TotalPieces"));
             type_info.spawn_col = num(ms2.get(monstats2_row, "spawnCol"));

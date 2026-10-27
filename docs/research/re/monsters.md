@@ -31,6 +31,56 @@ monster-ai.md.
   / S1 damage and to-hit, and El1..3 MinD / MaxD as DM % the same way
   (length as written). Checked: `tools/emu/monstats.py` (every row ×
   difficulty, 2202/2202).
+- **MonProp** (the end of `FUN_00573cb0`): `FUN_00573470` finds the row
+  by MonStats `+0x1a` (MonProp; the table at `[0x744304]+0xc30`, count
+  `+0xc34`, 0x138 bytes a row, loaded as `monprop` by `FUN_00658720` into
+  `0x96c860`). The row is +0 Id, then per difficulty (`+4 + 0x60 ×
+  difficulty`, the column `FUN_00573cb0` uses for the level) six
+  {prop, par, min, max} ints, then the chances, a byte each at `+0x124 +
+  6 × difficulty + slot`. The slots run in order up to the first prop
+  below 0. A slot with chance 0 always applies; any other steps the unit
+  seed (+0x20, × 0x6ac690c5 + carry) and applies when the seed % 100 is
+  below the chance. Applying is the item-property path,
+  `FUN_0065fd70(0, 0, unit, 0, 0, 0, slot, 0, 0x40, 0)`. In the stock
+  rows every chance is 0. Read from game.exe's own tables in the
+  emulator: Mephisto (MonStats 242, 704) props 86 cast2 and 56 swing2,
+  15 / 30; Blunderbore (186..189, 618, 619) 108 crush, 15 / 25; the
+  Council (345..347) 244 extra-fire, 40 / 100; baalhighpriest (557) 60 /
+  120; Blood Raven (267) 60 knock in Hell only; quillrat6..8 (605..607)
+  54 thorns 15..20 / 30..40; baboon6 (295) 262 fade 1 / 2 / 2; druidhawk
+  (419) 91 stupidity −1. No MonStats row names row 1 (irongolem, fade 16),
+  and nothing else reads the table, so the Iron Golem's row never applies
+  in 1.14d.
+  - What they do (`rules::monster_props`, `game::anim_rate_pct`,
+    `game::monprop_hit`): swing2 / cast2 are IAS 93 / FCR 105 on its A1 /
+    A2 and SC rates (`FUN_00623f50` → `FUN_00621740`, 120 × v / (120 +
+    v)). Thorns (78, damagedinmelee func 6, `FUN_005bf670`) puts its flat
+    value on a melee striker (unit +0xc4 bit 2) as physical damage through
+    `FUN_0057c6c0` → `FUN_0057c1e0`, so its damage reduction applies: the
+    player's swings and the merc's (`Fight::merc_strike`). Knockback (81,
+    func 7, `FUN_005bf960`) is a seed draw's low 7 bits under a bound,
+    result flag 8: 0x40 against a player or a plain monster, 0x20 for a
+    MonStats2 `large` one, 0x80 (always) a `small` one (byte +5 & 8 / & 4,
+    masks [0x6ce274] / [0x6ce270]; the column list at 0x6580a5 puts large
+    at flags bit 11, small at 10). Crushing blow (136, func 16,
+    `FUN_005bffc0`) is a seed draw % 100 under the value: current life
+    (stat 6) / a divisor, after the hit. The divisor: 10 for a player or a
+    hireling (`FUN_0063ee90`: classes 0x10f, 0x152, 0x167, 0x230, 0x231);
+    for another monster (a pet, or one made a foe by Confuse or Attract) 4,
+    8 for a MonStats boss (+0xc & 0x40, `FUN_0063e9f0`) or a unique (data
+    +0x16 & 2, `FUN_005a0180`), plus its monster_playercount share (stat
+    0x64, at least 1, through `FUN_005738f0`: the table at 0x6e1590, 0, 0,
+    50, 100 … %, then (n − 2) × 50); doubled for the missile event (6).
+    The share it takes off is the raw damageresist (stat 0x24), 100 at
+    most and none at 0 or less (`FUN_00483360`, × dr / 100), not a hit's
+    50 % cap. Life is set to the rest (0 at most: result flag 2), state
+    0x93 on when it took any. d2d: `Foe::knock_under` / `crush_divisor`
+    (`game::monster_foe_props`), `game::crushing_blow`; a monster foe
+    takes its crushes and knockback (`Fight::knock_back`) after the hits.
+    Stupidity (`FUN_005bfaa0`) acts on monster targets only; fade is
+    drawn by the client; fire mastery reaches only missiles the monster
+    owns, and the Council's and baalhighpriest's fire comes from their
+    Hydra's heads, so none of those three acts.
 
 ## Monster region — FUN_005479c0 / FUN_005475e0
 
