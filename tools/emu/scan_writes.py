@@ -4,7 +4,7 @@
     uv run python scan_writes.py b0                 # writes to [reg + 0xb0], any size
     uv run python scan_writes.py b0 2               # 2-byte writes only
     uv run python scan_writes.py b0 - 550000-5d0000 # any size, in that address range
-    uv run python scan_writes.py --reads b0         # reads instead (a source operand, cmp / test)
+    uv run python scan_writes.py --reads b0         # reads instead (`add [reg + 0xb0], 1` is both)
     uv run python scan_writes.py --exe PATH b0      # another game.exe than the MPQ folder's
 
 Finds who sets a field Ghidra's xrefs can't (a unit's +0xb0 hit class, a
@@ -19,8 +19,6 @@ import pefile
 from capstone import x86
 
 from emu import data_path
-
-WRITERS = {"mov", "add", "sub", "or", "and", "xor", "inc", "dec", "xchg", "not", "neg", "shl", "shr", "sar"}
 
 
 def main():
@@ -47,14 +45,11 @@ def main():
     for ins in md.disasm(text.get_data(), pe.OPTIONAL_HEADER.ImageBase + text.VirtualAddress):
         if not low <= ins.address < high or ins.id == 0 or not ins.operands:
             continue
-        if reads:
-            ops = [op for op in ins.operands[1:] if op.type == x86.X86_OP_MEM]
-            if ins.mnemonic in ("cmp", "test") and ins.operands[0].type == x86.X86_OP_MEM:
-                ops.append(ins.operands[0])
-        elif ins.mnemonic in WRITERS or ins.mnemonic.startswith("set"):
-            ops = [ins.operands[0]] if ins.operands[0].type == x86.X86_OP_MEM else []
-        else:
+        if ins.mnemonic == "lea":                        # an address, not a memory access
             continue
+        # capstone's operand access says which memory operand is read or written (adc, bts, cmpxchg, ...)
+        want = capstone.CS_AC_READ if reads else capstone.CS_AC_WRITE
+        ops = [op for op in ins.operands if op.type == x86.X86_OP_MEM and op.access & want]
         if any(op.mem.disp == offset and op.mem.base != 0 and (not size or op.size == size) for op in ops):
             print(f"{ins.address:08x}  {ins.mnemonic:7} {ins.op_str}")
 
