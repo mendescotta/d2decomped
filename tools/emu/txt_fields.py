@@ -144,18 +144,23 @@ def show(start, rows, mark=None, count=None):
 
 
 def main():
-    args = sys.argv[1:]
-    exe = None
+    args, exe = sys.argv[1:], None
+    every = "--all" in args
+    if every:
+        args.remove("--all")
     if "--exe" in args:
         at = args.index("--exe")
-        exe = args[at + 1]
-        del args[at:at + 2]
-    every = "--all" in args
-    args = [arg for arg in args if arg != "--all"]
-    if len(args) != 1:
+        if at + 1 == len(args):
+            sys.exit(__doc__)
+        exe = args.pop(at + 1)
+        del args[at]
+    if len(args) != 1 or args[0].startswith("--"):
         sys.exit(__doc__)
     args = [exe or os.path.join(data_path(), "bin", "game.exe"), *args]
-    pe = pefile.PE(args[0], fast_load=True)
+    try:
+        pe = pefile.PE(args[0], fast_load=True)
+    except (OSError, pefile.PEFormatError) as error:
+        sys.exit(f"txt_fields: {error}")
     image, base = pe.get_memory_mapped_image(), pe.OPTIONAL_HEADER.ImageBase
     try:
         function = int(args[1], 16)
