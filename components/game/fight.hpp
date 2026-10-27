@@ -537,6 +537,7 @@ struct Fight {
     // bleeding over time, a chill, a knockback. A kill counts.
     void land(std::size_t monster_index, const d2d::rules::Blow& blow, bool by_player, std::uint32_t now_ms);
     void merc_strike(std::size_t target, const d2d::rules::Swing& swing, std::uint32_t now_ms);   // the merc's melee blow on a monster, and its thorns back
+    void pet_strike(Pet& pet, std::size_t target, const d2d::rules::Blow& blow, std::uint32_t now_ms);   // a pet's melee blow, and its thorns back
     // A monster with GH and KB modes knocked back away from (from_x, from_y): land's knockback, a monster foe's (Smite, MonProp knock).
     void knock_back(Monster& target, float from_x, float from_y, std::uint32_t now_ms);
 

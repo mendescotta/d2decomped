@@ -1815,6 +1815,14 @@ auto Fight::merc_strike(std::size_t target, const d2d::rules::Swing& swing, std:
         if (blow.hit && thorns > 0) actor->merc_hurt += std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0);
     }
 
+auto Fight::pet_strike(Pet& pet, std::size_t target, const d2d::rules::Blow& blow, std::uint32_t now_ms) -> void {
+        const int thorns = monsters[target].props.thorns;
+        land(target, blow, false, now_ms);
+        // A MonProp thorns monster's flat value back on the pet (FUN_005bf670),
+        // a monster striker: through its own damage resist, as a monster's hit on a monster.
+        if (blow.hit && thorns > 0) pet_hurt(pet, d2d::rules::resisted(thorns, pet.monster.target(*game_data).res[0]), now_ms);
+    }
+
 auto Fight::merc_fighter() const -> d2d::rules::Fighter {
         using namespace d2d::d2s;
         // Its stats as a unit's (FUN_00572840's base, its worn items'
@@ -3491,7 +3499,7 @@ auto Fight::pets_turn(std::uint32_t now_ms, float elapsed, const Crowd& crowd) -
                                                          target, monster.stats.level, rng);
                         if (!traced && pet.hits > 0 && --pet.hits == 0) { monster.hit_points = 0; set_mode(*game_data, monster, "DT", now_ms); }   // a Raven's last
                         if (blow.hit && pet.fire_hi > 0) blow.damage += d2d::rules::resisted(rng.range(pet.fire_lo, pet.fire_hi), target.res[2]);   // Fire Golem
-                        land(monster_index, blow, false, now_ms);
+                        pet_strike(pet, monster_index, blow, now_ms);
                     }
                 }
                 if (now_ms < monster.mode_until) continue;
@@ -4175,7 +4183,7 @@ auto Fight::shadow_cast(Pet& pet, std::uint32_t now_ms, const Crowd& crowd) -> v
             auto fighter = actor->pf_kick;
             auto swing = skill_swing(*skill, lvl, calc_env(), false);
             add_charges(pet.charges, fighter, swing, false);
-            land(std::size_t(target), d2d::rules::player_blow(fighter, target_of(std::size_t(target)), monster.stats.level, rng, swing), false, now_ms);
+            pet_strike(pet, std::size_t(target), d2d::rules::player_blow(fighter, target_of(std::size_t(target)), monster.stats.level, rng, swing), now_ms);
             release(pet.charges, std::size_t(target), now_ms, false);
             return;
         }
@@ -4193,7 +4201,7 @@ auto Fight::shadow_cast(Pet& pet, std::uint32_t now_ms, const Crowd& crowd) -> v
         const bool finishing = finisher(skill);
         if (finishing) add_charges(pet.charges, fighter, swing, false);
         const auto blow = d2d::rules::player_blow(fighter, target_of(std::size_t(target)), monster.stats.level, rng, swing);
-        land(std::size_t(target), blow, false, now_ms);
+        pet_strike(pet, std::size_t(target), blow, now_ms);
         if (blow.hit && skill->srvstfunc == ServerStartFunction::kChargeUp) charge(pet.charges, *skill, lvl, now_ms);
         if (blow.hit && finishing) release(pet.charges, std::size_t(target), now_ms, false);
     }
@@ -4245,8 +4253,8 @@ auto Fight::pet_cast(Pet& pet, std::uint32_t now_ms, const Crowd& crowd) -> void
         }
         if (!alive) { monsters[std::size_t(target)].corpse_used = true; return; }   // Fenris eats the corpse
         if (std::hypot(monsters[std::size_t(target)].unit.x - monster.unit.x, monsters[std::size_t(target)].unit.y - monster.unit.y) <= kMeleeReach + 0.3f)
-            land(std::size_t(target), d2d::rules::player_blow(d2d::rules::simple_fighter(monster.stats.a1_min, monster.stats.a1_max, monster.stats.to_hit),
-                                                              target_of(std::size_t(target)), monster.stats.level, rng), false, now_ms);
+            pet_strike(pet, std::size_t(target), d2d::rules::player_blow(d2d::rules::simple_fighter(monster.stats.a1_min, monster.stats.a1_max, monster.stats.to_hit),
+                                                                         target_of(std::size_t(target)), monster.stats.level, rng), now_ms);
     }
 
 auto Fight::cast_scroll(int skill, std::uint32_t now_ms) -> bool {

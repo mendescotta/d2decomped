@@ -25,6 +25,7 @@
 #include <rules.hpp>
 #include <skill_text.hpp>
 #include <skills.hpp>
+#include <uniques.hpp>
 #include <world.hpp>
 
 #include <algorithm>
@@ -152,7 +153,7 @@ int main(int argc, char** argv) try {
         std::printf("OK: MonProp knock and crush on monster foes\n");
     }
     if (data->patched) {                                          // the 1.14d tables (the CD's may differ)
-        // MonProp rows as game.exe compiled them (tools/monprop_rows.py: the
+        // MonProp rows as game.exe compiled them (tools/emu/monprop_rows.py: the
         // emulator's DataTables +0xc30), per MonStats row and difficulty;
         // every other row has none.
         struct Case { int row, difficulty; std::string_view code; int min, max; };
@@ -175,9 +176,9 @@ int main(int argc, char** argv) try {
             for (const auto& per_difficulty : type.props) slots += per_difficulty.size();
         assert(slots == std::size(kCases));
         std::array<std::array<std::size_t, 3>, 800> seen{};
-        for (const auto& c : kCases) {
-            const auto& slot = data->monsters.types.at(std::size_t(c.row)).props[std::size_t(c.difficulty)].at(seen[std::size_t(c.row)][std::size_t(c.difficulty)]++);
-            assert(slot.code == c.code && slot.min == c.min && slot.max == c.max && slot.chance == 0);
+        for (const auto& entry : kCases) {
+            const auto& slot = data->monsters.types.at(std::size_t(entry.row)).props[std::size_t(entry.difficulty)].at(seen[std::size_t(entry.row)][std::size_t(entry.difficulty)]++);
+            assert(slot.code == entry.code && slot.min == entry.min && slot.max == entry.max && slot.chance == 0);
         }
         // What they come to: Mephisto's Hell IAS and FCR, a Hell quill rat's
         // thorns drawn on its seed, Blunderbore's crush.
@@ -737,6 +738,19 @@ int main(int argc, char** argv) try {
         const auto lead_exp = coop.lead().character.stats.get(d2d::d2s::kExp), second_exp = second.character.stats.get(d2d::d2s::kExp);
         assert(coop.fight.monster_index(prey_id) >= 0);
         const auto prey_index = std::size_t(coop.fight.monster_index(prey_id));
+        // A MonProp thorns monster's flat value back on a pet that hits it
+        // (FUN_005bf670), through the pet's physical resist; none on a miss.
+        {
+            d2d::rules::Rng pet_rng{ 5 };
+            Fight::Pet pet{ .monster = make_monster(*data, prey_type, second.player.x, second.player.y, pet_rng, 0) };
+            const int life = pet.monster.hit_points, resist = pet.monster.target(*data).res[0];
+            coop.fight.monsters[prey_index].props.thorns = 40;
+            coop.fight.pet_strike(pet, prey_index, { .hit = false }, now_ms);
+            assert(pet.monster.hit_points == life);
+            coop.fight.pet_strike(pet, prey_index, { .hit = true }, now_ms);
+            assert(pet.monster.hit_points == life - d2d::rules::resisted(40, resist));
+            coop.fight.monsters[prey_index].props.thorns = 0;
+        }
         coop.fight.monsters[prey_index].hit_points = 0;
         coop.fight.killed(prey_index, now_ms);
         assert(coop.lead().character.stats.get(d2d::d2s::kExp) > lead_exp && second.character.stats.get(d2d::d2s::kExp) > second_exp);
