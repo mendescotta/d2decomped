@@ -157,6 +157,24 @@ uv run python diff_drlg.py 1-20 2 drops         # then three items dropped at ea
   `uv run python diff_drlg.py 1-2000 40 layout`. Every dump builds a level
   in its own act (`act_of`).
 
+## Reading game.exe without Ghidra
+
+Quick capstone helpers for when a Ghidra run is too slow or its decompile
+hides the detail (fastcall registers, stack-built tables). Each finds
+game.exe as `emu.py` does (`--exe PATH` for another).
+
+- `disasm.py 623f50 [COUNT]`: a function from its address to its `ret`
+  (or COUNT instructions). `disasm.py --all out.txt` writes every
+  executable section, a line an instruction, to grep for an immediate
+  (a string's or a table's address) or an instruction shape.
+- `scan_writes.py OFFSET [SIZE] [LO-HI]`: every instruction that writes
+  `[reg + OFFSET]` (`--reads`: reads it), to find who sets a struct
+  field Ghidra's xrefs can't see.
+- `txt_fields.py NAME` / `txt_fields.py LOADER`: the column list an excel
+  table's loader builds on the stack, a line a column: its type, size or
+  bit, and record offset (`HitClass type 0x4 ... +0x94` in Missiles.txt,
+  FUN_00661b20). `--all` shows NAME in every table that has it.
+
 ## Adding a new oracle
 
 1. Find the entry point and its calling convention with Ghidra.
