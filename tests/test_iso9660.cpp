@@ -5,6 +5,7 @@
 // framework, no fixtures.
 
 #include <iso9660.hpp>
+#include "skip.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -18,13 +19,13 @@
 int main() {
     namespace fs = std::filesystem;
     const char* home = std::getenv("HOME");
-    if (!home) { std::puts("test_iso9660: no HOME, skipped"); return 0; }
+    if (!home) { std::puts("SKIP: no HOME"); return d2d::test::kSkipped; }
 
     const fs::path iso = fs::path(home) / "Downloads"
         / "Diablo II + LoD" / "1. INSTALL DISC.ISO";
     if (!fs::exists(iso)) {
-        std::printf("test_iso9660: %s not found, skipped\n", iso.string().c_str());
-        return 0;
+        std::printf("SKIP: %s not found\n", iso.string().c_str());
+        return d2d::test::kSkipped;
     }
 
     auto reader = iso9660::Reader::open(iso);

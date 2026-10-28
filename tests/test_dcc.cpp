@@ -2,6 +2,7 @@
 // Parse real DCC sprites and verify structure + decoded pixels.
 #include <dcc.hpp>
 #include <mpq.hpp>
+#include "skip.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -20,7 +21,7 @@ int main() try {
     const auto d2char = dir / "d2char.mpq";
     if (!fs::exists(d2char)) {
         std::printf("SKIP: %s not found\n", d2char.string().c_str());
-        return 0;
+        return d2d::test::kSkipped;
     }
 
     d2d::mpq::Archive archive(d2char);

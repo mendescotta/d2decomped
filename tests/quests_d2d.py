@@ -33,7 +33,7 @@ data = os.environ.get("D2_MPQ_DIR") or os.path.expanduser("~/Workspace/private/d
 patch = os.environ.get("D2_PATCH_INSTALLER")
 if not os.path.exists(os.path.join(data, "d2data.mpq")) or not patch or not os.path.exists(patch):
     print("SKIP: the MPQs or D2_PATCH_INSTALLER not found")
-    sys.exit(0)
+    sys.exit(77)   # ctest's SKIP_RETURN_CODE (tests/CMakeLists.txt)
 
 home = tempfile.mkdtemp(prefix="d2d_quests_")
 user = os.path.join(home, "Library/Preferences/d2d" if platform.system() == "Darwin" else ".config/d2d")

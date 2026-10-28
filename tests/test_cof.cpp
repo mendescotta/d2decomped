@@ -2,6 +2,7 @@
 // Parse two real COF files (already used as byte-length canary in test_mpq).
 #include <cof.hpp>
 #include <mpq.hpp>
+#include "skip.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,7 +23,7 @@ int main() try {
     const auto d2char = dir / "d2char.mpq";
     if (!fs::exists(d2char)) {
         std::printf("SKIP: %s not found\n", d2char.string().c_str());
-        return 0;
+        return d2d::test::kSkipped;
     }
 
     d2d::mpq::Archive archive(d2char);

@@ -3,6 +3,7 @@
 // English strings. Skips when the MPQ isn't reachable (same rule as test_mpq).
 #include <mpq.hpp>
 #include <tbl.hpp>
+#include "skip.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -22,7 +23,7 @@ int main() try {
     const auto d2data = dir / "d2data.mpq";
     if (!fs::exists(d2data)) {
         std::printf("SKIP: %s not found\n", d2data.string().c_str());
-        return 0;
+        return d2d::test::kSkipped;
     }
 
     d2d::mpq::Archive archive(d2data);

@@ -6,11 +6,13 @@ framework — a `main()` that returns 0 on success, checking with plain
 `assert` (CMakeLists.txt keeps NDEBUG off for this directory, so asserts
 stay on in Release builds); nothing fancier is warranted yet.
 
-Tests that need real assets (D2 ISOs, extracted MPQs, …) locate them at
-runtime and print a skip line (`SKIP: ...`) when absent, so `ctest` stays
-green on a bare checkout. ctest counts such a test as passed, so a green
-run without the data has run none of the data-backed checks: `ctest -V`
-(or `build/Testing/Temporary/LastTest.log`) shows the skip lines.
+Tests that need real assets (D2 ISOs, extracted MPQs, game.exe) locate
+them at runtime; when they're absent the test prints a `SKIP:` line and
+returns `d2d::test::kSkipped` (`skip.hpp`; the .py tests `sys.exit(77)`).
+ctest lists those as skipped, not passed, so a bare checkout stays green
+and its summary shows which data-backed tests didn't run. A test that
+skips only part of its checks (test_d2s's real saves, test_mpq's
+installer) prints a `SKIP` line for that part and still passes.
 
 Run: `ctest --test-dir build --output-on-failure`.
 

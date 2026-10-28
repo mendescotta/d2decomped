@@ -8,6 +8,7 @@
 #include <outdoor.hpp>
 #include <outdoor_data.hpp>
 #include <room_tiles.hpp>
+#include "skip.hpp"
 
 #include <algorithm>
 #include <array>
@@ -26,7 +27,7 @@ using namespace d2d::drlg;
 int main() try {
     const char* env = std::getenv("D2_MPQ_DIR");
     const fs::path dir = env ? fs::path(env) : fs::path(std::getenv("HOME") ? std::getenv("HOME") : "") / "Workspace/private/diablo2";
-    if (!fs::exists(dir / "d2data.mpq")) { std::printf("SKIP: no d2data.mpq in %s\n", dir.string().c_str()); return 0; }
+    if (!fs::exists(dir / "d2data.mpq")) { std::printf("SKIP: no d2data.mpq in %s\n", dir.string().c_str()); return d2d::test::kSkipped; }
     d2d::mpq::Stack mpqs;
     if (const char* patch = std::getenv("D2_PATCH_INSTALLER")) mpqs.push_installer(patch);
     for (const char* name : { "d2exp.mpq", "d2data.mpq" }) if (fs::exists(dir / name)) mpqs.push(dir / name);

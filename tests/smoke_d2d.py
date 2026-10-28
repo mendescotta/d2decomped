@@ -17,7 +17,7 @@ d2d = sys.argv[1]
 data = os.environ.get("D2_MPQ_DIR") or os.path.expanduser("~/Workspace/private/diablo2")
 if not os.path.exists(os.path.join(data, "d2data.mpq")):
     print(f"SKIP: {data}/d2data.mpq not found")
-    sys.exit(0)
+    sys.exit(77)   # ctest's SKIP_RETURN_CODE (tests/CMakeLists.txt)
 
 home = tempfile.mkdtemp(prefix="d2d_smoke_")
 user = os.path.join(home, "Library/Preferences/d2d" if platform.system() == "Darwin"

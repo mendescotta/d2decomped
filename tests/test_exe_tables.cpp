@@ -6,6 +6,7 @@
 // none (or another version) prints "skip" and passes.
 // RULE: every table copied from game.exe gets an entry in kTables below.
 #include <install.hpp>
+#include "skip.hpp"
 
 #include <compcode.hpp>
 #include <drlg.hpp>
@@ -450,10 +451,10 @@ fs::path find_exe() {
 
 int main() {
     const fs::path path = find_exe();
-    if (path.empty() || !fs::is_regular_file(path)) { std::printf("skip: no game.exe (set D2_GAME_EXE)\n"); return 0; }
+    if (path.empty() || !fs::is_regular_file(path)) { std::printf("SKIP: no game.exe (set D2_GAME_EXE)\n"); return d2d::test::kSkipped; }
     if (d2d::install::file_version(path) != std::array<std::uint16_t, 4>{ 1, 14, 3, 71 }) {
-        std::printf("skip: %s is not 1.14.3.71\n", path.string().c_str());
-        return 0;
+        std::printf("SKIP: %s is not 1.14.3.71\n", path.string().c_str());
+        return d2d::test::kSkipped;
     }
     const Exe exe(path);
     for (const auto& table : kTables) {

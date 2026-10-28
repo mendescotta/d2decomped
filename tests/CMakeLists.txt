@@ -9,10 +9,16 @@ foreach(v CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS
     string(REGEX REPLACE "[-/]DNDEBUG" "" ${v} "${${v}}")
 endforeach()
 
+# A test with no data to run on (no MPQs, ISO or game.exe) exits 77
+# (skip.hpp's kSkipped, sys.exit(77) in the .py tests): ctest lists it as
+# skipped, so a green run says which data-backed checks ran.
+set(d2d_skip_code 77)
+
 function(d2d_add_test name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE ${ARGN})
     add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE ${d2d_skip_code})
 endfunction()
 
 d2d_add_test(test_iso9660 iso9660)
@@ -82,6 +88,8 @@ if (Python3_Interpreter_FOUND)
                  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/quests_d2d.py $<TARGET_FILE:d2d> ${act})
         list(APPEND d2d_quest_tests quests_act${act})
     endforeach()
+    set_tests_properties(smoke_d2d coop_d2d coop_lobby_d2d pad_use_d2d ${d2d_quest_tests}
+                         PROPERTIES SKIP_RETURN_CODE ${d2d_skip_code})
 endif()
 
 # Optional game-data inputs, handed to the tests that use them (they skip
