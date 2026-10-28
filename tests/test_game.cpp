@@ -835,23 +835,23 @@ int main(int argc, char** argv) try {
     {   // A converted monster is no target: game.exe's cursor drops a unit the player can't
         // interact with (HitTestScreen: CanInteractWith is !IsAllyOf), so an attack names it only
         // through devctl or the net; World turns that away too and the hero stays put.
-        auto& hero = *world.actor;
+        auto& attacker = *world.actor;
         Monster turned;
         turned.id = 0x7ffff0;
         turned.hit_points = 100;
         turned.align = 2;
-        turned.unit.x = hero.player.x + 2;
-        turned.unit.y = hero.player.y;
+        turned.unit.x = attacker.player.x + 2;
+        turned.unit.y = attacker.player.y;
         world.fight.monsters.push_back(turned);
         const auto index = int(world.fight.monsters.size() - 1);
-        hero.attack_mon = -1;
-        const std::vector<Order> attack{ { hero.id, cmd::UseSkill{ 0, turned.unit.x, turned.unit.y, turned.id, true } } };
+        attacker.attack_mon = -1;
+        const std::vector<Order> attack{ { attacker.id, cmd::UseSkill{ 0, turned.unit.x, turned.unit.y, turned.id, true } } };
         world.tick(attack, (4502 + 1) * kTickMs, 4502 * kTickMs);
-        assert(hero.attack_mon == -1);
+        assert(attacker.attack_mon == -1);
         world.fight.monsters[std::size_t(index)].align = 0;   // the same monster, hostile: attacked
         world.tick(attack, (4502 + 2) * kTickMs, (4502 + 1) * kTickMs);
-        assert(hero.attack_mon == index);
-        hero.attack_mon = -1;
+        assert(attacker.attack_mon == index);
+        attacker.attack_mon = -1;
         world.fight.monsters.pop_back();
         std::printf("OK: a converted monster isn't attacked\n");
     }
