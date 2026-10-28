@@ -69,12 +69,17 @@ def main():
     image = pe.get_memory_mapped_image()
     if not 0 <= va - base < len(image):
         sys.exit(f"disasm: {va:08x} is outside the image ({base:08x}-{base + len(image):08x})")
-    end = va
-    for done, ins in enumerate(md.disasm(image[va - base:], va), 1):   # stops at the image's end or a byte it can't decode
-        print(f"{ins.address:08x}  {ins.mnemonic:7} {ins.op_str}")
-        end = ins.address + ins.size
-        if (count and done >= count) or (not count and ends_function(image, base, ins)):
-            return
+    end, done = va, 0
+    while True:   # capstone decodes a whole call's buffer first, so a batch at a time
+        batch = list(md.disasm(image[end - base:end - base + 16 * 256], end, min(256, count - done) if count else 256))
+        for ins in batch:
+            print(f"{ins.address:08x}  {ins.mnemonic:7} {ins.op_str}")
+            end = ins.address + ins.size
+            done += 1
+            if (count and done >= count) or (not count and ends_function(image, base, ins)):
+                return
+        if not batch:   # the image's end or a byte it can't decode
+            break
     if end - base < len(image):
         sys.exit(f"disasm: stopped at {end:08x}, a byte capstone can't decode")
     sys.exit(f"disasm: reached the image's end at {end:08x}")

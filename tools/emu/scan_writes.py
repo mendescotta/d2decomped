@@ -20,6 +20,10 @@ from capstone import x86
 
 from emu import data_path
 
+# capstone 5.0.x marks these x87 stores' memory operand as read (fstp dword, fist, fnstcw, ...)
+X87_STORES = {"fst", "fstp", "fist", "fistp", "fisttp", "fbstp", "fnstcw", "fstcw", "fnstsw", "fstsw",
+              "fnstenv", "fstenv", "fnsave", "fsave"}
+
 
 def main():
     args, exe = sys.argv[1:], None
@@ -61,7 +65,8 @@ def main():
             continue
         # capstone's operand access says which memory operand is read or written (adc, bts, cmpxchg, ...)
         want = capstone.CS_AC_READ if reads else capstone.CS_AC_WRITE
-        ops = [op for op in ins.operands if op.type == x86.X86_OP_MEM and op.access & want]
+        store = ins.mnemonic in X87_STORES
+        ops = [op for op in ins.operands if op.type == x86.X86_OP_MEM and (capstone.CS_AC_WRITE if store else op.access) & want]
         if any(op.mem.disp == offset and op.mem.base != 0 and (not size or op.size == size) for op in ops):
             print(f"{ins.address:08x}  {ins.mnemonic:7} {ins.op_str}")
             found = True
