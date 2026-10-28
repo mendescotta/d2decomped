@@ -2,8 +2,10 @@
 
 One list of what d2d still doesn't do, or doesn't do the way game.exe
 1.14d does, in the base game (no expansion). Act 5 and the LoD-only
-classes and items are out of scope here. The details stay in the docs
-each row points to; this file is the index. As of 2026-10-23.
+classes and items are out of scope here: what's open there is in PLAN.md
+"Checkpoint 2026-10-24: Act 5" ("Still open for Act 5"). The details stay
+in the docs each row points to; this file is the index. Rows as of
+2026-10-23; the sound and `ponytail:` counts as of 2026-10-28.
 
 **Kind:**
 - *build*: game.exe does it and d2d doesn't yet.
@@ -39,7 +41,9 @@ Ranked by Seen, then by how much play it touches.
 ## Sounds
 
 `tools/sound_coverage.py <mpq dir>`: 3,414 of the base install's 3,520
-sounds play, 106 don't (2026-10-27).
+sounds play, 106 don't (2026-10-28). 91 of the 106 are traced as never
+played by stock 1.14d (rows 16 and 19), so d2d plays 3,414 of the 3,429
+the original does (unit-sounds.md "In d2d").
 
 | # | What | Count | Kind | Seen | Notes |
 |---|---|---|---|---|---|
@@ -106,8 +110,8 @@ docs/design/net-join-plan.md, PLAN.md "Checkpoint 2026-10-19".
 
 ## The long tail
 
-456 `ponytail:` notes in components/ and apps/ (2026-10-23), most in
-ai.cpp (48), fight.cpp (45), world.cpp (44) and fight.hpp (42). Each names
+513 `ponytail:` notes in components/ and apps/ (2026-10-28), most in
+ai.cpp (71), fight.cpp (47), world.cpp (45) and fight.hpp (42). Each names
 the game.exe function to trace when it matters. act1-gaps.md sorted them
 on 2026-10-10 (most don't change single-player play); `git grep -n
 ponytail:` lists them. Items here that a player could notice belong in a

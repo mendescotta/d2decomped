@@ -352,6 +352,12 @@ The remaining 106 rows have these causes:
 | 1 `andariel_quake_loop` | The screen shake's sound. FUN_00476a80 (strength, ramp in, hold, fade out in ms) starts a shake; each frame FUN_00476d40 takes its strength along that envelope, moves the camera up to twice it either way, and FUN_004769d0 plays this row unplaced at volume strength x 255 / 10 (at most 255), stopping it at 0. Shakes start from the missiles' pCltDoFunc 29 (andycontrol0), 31 (horadricstaff), 36 (durieldeathcontrol), 37 (diablo), 54 (anya) and 58 (royalstrikechaosice), event message 0x12 and the client skill function 0x727a90[145]; d2d has no screen shake yet. |
 | 1 `scene_tavern_interior` | Front-end tavern scene only; d2d does not implement that scene. |
 
+Of the 106, 91 are traced as never played by stock 1.14d: the 70 class
+quest phrases, the 8 rogue confirms and the 13 NPC rows. So d2d plays 3,414
+of the 3,429 rows the original does. The five desert-night rows aren't
+counted with them: no SoundEnviron row names them, but no code path playing
+them has been ruled out.
+
 These are trigger or feature gaps, not missing audio files. The two shrine
 sounds are covered by shrine activation cues; the audit counts code cues even
 when a same-named overlay/state field also appears in the tables.

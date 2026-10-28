@@ -18,8 +18,9 @@ d2d copies.
 
 **Toggles:** an improvement that changes what a player sees can be turned
 off with `--toggle name=off[,name=off...]` (apps/d2d/main.cpp `kToggles`):
-`trans_roof` (improvement 4), `autoloot` (improvement 5), `autoparty` (improvement 7),
-`pad_controls` (improvement 11), `coop_lobby` (improvement 12).
+`light_grid` (improvement 1), `trans_roof` (improvement 4), `autoloot` (improvement 5),
+`autoparty` (improvement 7), `pad_controls` (improvement 11), `coop_lobby` (improvement 12),
+`pause_sounds` (improvement 13).
 
 ## Improvements
 
@@ -57,8 +58,9 @@ off with `--toggle name=off[,name=off...]` (apps/d2d/main.cpp `kToggles`):
 | 12 | TCP/IP Options' own address | Read again every 5 s (record 0x10b) | Read once as the screen opens | only if the network changes while it's up | main.cpp `Screen::TcpIp` |
 | 13 | World sounds' pan, and a loop back in range | Pans by turning the far speaker down to (255 − pan) / 127 (`FUN_00515890`); a Tracking loop stopped past its far range waits, not freed, and starts again back in range (`FUN_004ba020`) | matched since this commit: each world sound is two sources, one per speaker (`AL_SOFT_direct_channels`, `Audio::start_split`); without the extension OpenAL pans a mono source by its angle | only without the extension | audio.hpp `apply_mix` |
 
-About 200 smaller shortcuts are marked `ponytail:` in the code; this table
-holds the ones a player could notice or a test could trip on.
+513 smaller shortcuts are marked `ponytail:` in components/ and apps/
+(2026-10-28; `git grep -c ponytail: -- components apps`); this table holds
+the ones a player could notice or a test could trip on.
 
 ## Additions
 
