@@ -2266,13 +2266,13 @@ auto Town::field_play(PadPlayer& player_pad, pad::Mapper& mapper, const World::P
         pad_walk(player_pad, hero_there.player, dead && !hero_there.ghost, field, out);   // a ghost walks
         // Its hands' charged entries (kept while another player has the
         // screen); one gone since is Attack / 0, as the skillbar's drop_gone.
-        auto& held = hand_items[hero_there.id];
+        auto& hands = hand_items[hero_there.id];
         int left_skill = int(hero_there.character.header.left_skill), right_skill = int(hero_there.character.header.right_skill);
         const auto entries = d2d::game::charged_skills(hero_there.character.items);
         const auto gone = [&](int skill, int item) { return item >= 0 && std::ranges::none_of(entries, [&](const d2d::game::ChargedSkill& had) { return had.item == item && had.skill == skill; }); };
-        if (gone(left_skill, held.left)) { left_skill = 0; held.left = -1; }
-        if (gone(right_skill, held.right)) { right_skill = 0; held.right = -1; }
-        pad_act(player_pad, hero_there.player, dead, field, left_skill, right_skill, out, held.left, held.right);
+        if (gone(left_skill, hands.left)) { left_skill = 0; hands.left = -1; }
+        if (gone(right_skill, hands.right)) { right_skill = 0; hands.right = -1; }
+        pad_act(player_pad, hero_there.player, dead, field, left_skill, right_skill, out, hands.left, hands.right);
         return opens;
     }
 
