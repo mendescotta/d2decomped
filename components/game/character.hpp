@@ -102,14 +102,20 @@ inline std::vector<d2d::d2s::ItemProp> set_props(const GameData& game_data, cons
     return out;
 }
 
+// An item whose stats reach the character: worn (slots 1..10, the weapon
+// set in use) or an inventory charm, and not broken.
+inline bool gear_active(const d2d::d2s::Item& item) {
+    const bool worn = item.location == d2d::d2s::item_location::kEquipped && item.slot >= d2d::d2s::body_location::kFirst && item.slot <= d2d::d2s::body_location::kLast;
+    const bool charm = item.location == d2d::d2s::item_location::kStored && item.panel == d2d::d2s::item_panel::kInventory && (item.code == "cm1" || item.code == "cm2" || item.code == "cm3");
+    return (worn || charm) && !d2d::rules::broken(item);
+}
+
 // Everything the character's gear gives: worn items (slots 1..10), what's
 // socketed in them, their set bonuses on, inventory charms.
 inline std::vector<d2d::d2s::ItemProp> gear_props(const GameData& game_data, const std::vector<d2d::d2s::Item>& items) {
     std::vector<d2d::d2s::ItemProp> out;
     for (const auto& item : items) {
-        const bool worn = item.location == d2d::d2s::item_location::kEquipped && item.slot >= d2d::d2s::body_location::kFirst && item.slot <= d2d::d2s::body_location::kLast;
-        const bool charm = item.location == d2d::d2s::item_location::kStored && item.panel == d2d::d2s::item_panel::kInventory && (item.code == "cm1" || item.code == "cm2" || item.code == "cm3");
-        if ((!worn && !charm) || d2d::rules::broken(item)) continue;
+        if (!gear_active(item)) continue;
         out.insert(out.end(), item.props.begin(), item.props.end());
         for (const auto& socketed : item.socketed_items) {
             const auto filled = socket_props(game_data, item, socketed);
@@ -121,6 +127,56 @@ inline std::vector<d2d::d2s::ItemProp> gear_props(const GameData& game_data, con
     const auto sets = set_props(game_data, items);
     out.insert(out.end(), sets.begin(), sets.end());
     return out;
+}
+
+// A skill an item's charges give (stat 204, item_charged_skill: param
+// skill << 6 | level, value max << 8 | left). game.exe keeps one skill
+// entry per item and skill (SKILLS_AddOrRemoveItemSkill, keyed by the
+// item's unit id, skill entry +0x34), added by the stat hook while the
+// item's stats reach its owner and it has charges left, removed at 0.
+struct ChargedSkill {
+    int item = -1;                         // the holder's Item::id (its socketed items' charges are its own, FUN_0065c820)
+    int skill = -1, level = 0, left = 0, max = 0;
+    friend bool operator==(const ChargedSkill&, const ChargedSkill&) = default;
+};
+[[nodiscard]] inline ChargedSkill charged_skill(int item_id, const d2d::d2s::ItemProp& prop) {
+    return { item_id, prop.param >> 6, prop.param & 63, prop.value & 255, prop.value >> 8 };
+}
+// The character's charged skill entries, in item order: each active item's
+// (gear_active) and its socketed items' stat 204 with a level of 1..63
+// (FUN_0065c820) and charges left.
+inline std::vector<ChargedSkill> charged_skills(const std::vector<d2d::d2s::Item>& items) {
+    std::vector<ChargedSkill> out;
+    const auto add = [&](int item_id, const d2d::d2s::Item& holder) {
+        for (const auto& prop : holder.props)
+            if (const auto entry = charged_skill(item_id, prop); prop.stat == d2d::d2s::kChargedSkill && entry.level >= 1 && entry.left > 0
+                && std::ranges::none_of(out, [&](const ChargedSkill& had) { return had.item == item_id && had.skill == entry.skill; }))
+                out.push_back(entry);
+    };
+    for (const auto& item : items) {
+        if (!gear_active(item)) continue;
+        add(item.id, item);
+        for (const auto& socketed : item.socketed_items) add(item.id, socketed);
+    }
+    return out;
+}
+
+// A cast from charged entry `entry` spends one charge (FUN_0056bec0, the
+// skill's cost in place of mana, FUN_0056bfe0): the stat on the entry's
+// item, else on an item socketed in it (FUN_0065c820), goes to max << 8 |
+// max(left - 1, 0). False when nothing is left to spend.
+inline bool use_charge(std::vector<d2d::d2s::Item>& items, const ChargedSkill& entry) {
+    const auto spend = [&](d2d::d2s::Item& holder) {
+        for (auto& prop : holder.props)
+            if (const auto had = charged_skill(entry.item, prop); prop.stat == d2d::d2s::kChargedSkill && had.skill == entry.skill && had.level == entry.level && had.left > 0) {
+                prop.value = had.max << 8 | std::min(had.left - 1, had.max);
+                return true;
+            }
+        return false;
+    };
+    const auto item = std::ranges::find(items, entry.item, &d2d::d2s::Item::id);
+    if (entry.item < 0 || item == items.end()) return false;
+    return spend(*item) || std::ranges::any_of(item->socketed_items, spend);
 }
 
 // The char panel's computed values (stat 30 next level, 31 defence,

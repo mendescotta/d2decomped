@@ -514,6 +514,36 @@ lines (missile names aren't passed in). What it does:
   FUN_004c9280), the skill picker by SkillsPal.cpp (FUN_004c9b40); icons
   are `Spells\<Cl>Skillicon` (already loaded for the tree).
 
+### Item charges (traced 2026-10-28; todo #4)
+- Stat 0xcc (204, item_charged_skill): param skill << 6 | level, value
+  max << 8 | left.
+- Entries: the server's stat hook adds a skill entry per item and skill
+  (SKILLS_AddOrRemoveItemSkill, entry +0x34 the item's unit id) while the
+  item's stats reach its owner (worn in the active weapon set) and charges
+  are left; at 0, or taken off, the entry goes, and a hand that held it
+  goes back to Attack (left) or skill 0 (right). `game::charged_skills`.
+- Level: the entry's own; +skills don't reach it.
+- Cost (FUN_0056bfe0, after the start or do function where mana's paid):
+  an entry with an item pays one charge and no mana (FUN_0056bec0: the
+  stat on the item, else in its sockets, FUN_0065c820; left - 1, at least
+  0; stat packet 0x3e). FUN_005531c0 there is the unit's client, not a
+  sound. `Fight::pay`.
+- Usable (FUN_00647840): the entry's item still in the inventory with the
+  stat nonzero. The client starts nothing from an entry with 0 charges and
+  plays the skill's ItemCastSound for an entry's cast (FUN_004c6140,
+  Skills.txt +0x122), as for a scroll.
+- Picker (SPELLSEL_DrawSkillGrid): rows 0..3 by ListRow, the entries on
+  the top row; the charges left on the icon and the button
+  (SPELLSEL_DrawSkillLevel: x + 4, the icon's bottom - 1, colour 3).
+  Hotkeys keep the entry's item. d2d: `SkillBar::Pick`, `UseSkill::item`.
+- Load: the save keeps skill ids only and a loaded game selects the
+  character's own entry (SelectSkill(id, -1)), so a saved charged hand
+  falls back.
+- Repair: the missing charges are priced (FUN_00628d30 with 10000, after
+  the npc's rep mults; none on an ethereal item, FUN_0062a8d0) and
+  refilled (FUN_0055fe80, from FUN_005761c0 and the cube's flag 0x400).
+  Skills.txt cost mult +0x234, cost add +0x238, reqlevel +0x174.
+
 ### Passives and masteries (phase 3)
 - Record: +0x94 `passivestate`, +0x96 `passiveitype`, +0x98 passivestat1..5
   (shorts), +0xa4 passivecalc1..5.

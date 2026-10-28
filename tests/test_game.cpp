@@ -632,6 +632,50 @@ int main(int argc, char** argv) try {
         gear[1].slot = 0; gear[2].panel = 5;                      // one piece worn, the charm stashed
         assert(total(0) == 0 && total(80) == 0);
     }
+    {
+        // Charged skills (stat 204: param skill << 6 | level, value max << 8 |
+        // left): an entry per worn item and skill with charges left; a
+        // socketed item's under its holder's id (FUN_0065c820).
+        namespace loc = d2d::d2s::item_location;
+        namespace body = d2d::d2s::body_location;
+        const int fire_bolt = data->skills.by_name.at("Fire Bolt");
+        const auto charges = [&](int level, int left, int most) { return d2d::d2s::ItemProp{ .stat = d2d::d2s::kChargedSkill, .param = fire_bolt << 6 | level, .value = most << 8 | left }; };
+        d2d::d2s::Item wand;
+        wand.code = "wnd"; wand.location = loc::kEquipped; wand.slot = body::kRightArm; wand.id = 9001;
+        wand.props = { charges(4, 2, 2) };
+        assert((charged_skills({ wand }) == std::vector<ChargedSkill>{ { 9001, fire_bolt, 4, 2, 2 } }));
+        d2d::d2s::Item stored = wand; stored.location = loc::kStored;
+        d2d::d2s::Item empty = wand; empty.props = { charges(4, 0, 2) };
+        d2d::d2s::Item jewel; jewel.props = { charges(2, 1, 5) };
+        d2d::d2s::Item holder = wand; holder.props.clear(); holder.socketed_items = { jewel };
+        assert(charged_skills({ stored }).empty() && charged_skills({ empty }).empty());
+        assert((charged_skills({ holder }) == std::vector<ChargedSkill>{ { 9001, fire_bolt, 2, 1, 5 } }));
+        // A cast from the entry (UseSkill::item) is at its own level, +skills
+        // or not, and costs a charge, no mana (FUN_0056bfe0 -> FUN_0056bec0);
+        // at 0 the entry's gone and the item turned away.
+        auto& caster = *world.actor;
+        const auto saved_items = caster.character.items;
+        const auto mana = caster.character.stats.values[d2d::d2s::kMana];
+        d2d::d2s::Item ring;
+        ring.code = "rin"; ring.location = loc::kEquipped; ring.slot = body::kRightRing; ring.id = 9002;
+        ring.props = { { .stat = d2d::d2s::kAllSkills, .value = 3 } };
+        caster.character.items.push_back(wand);
+        caster.character.items.push_back(ring);
+        const std::uint32_t cast_ms = 26 * kTickMs;
+        const float aim_x = caster.player.x + 2, aim_y = caster.player.y;
+        for (int cast = 0; cast < 2; ++cast) {
+            caster.pmode = -1;
+            world.apply(cmd::UseSkill{ fire_bolt, aim_x, aim_y, -1, false, 9001 }, cast_ms);   // in town: no cast, the entry taken
+            assert(caster.charge == (ChargedSkill{ 9001, fire_bolt, 4, 2 - cast, 2 }) && world.fight.skill_level(fire_bolt) == 4);
+            assert(world.fight.cast_missile(fire_bolt, aim_x, aim_y, cast_ms));
+            assert(caster.character.stats.values[d2d::d2s::kMana] == mana);
+        }
+        assert(caster.character.items[saved_items.size()].props[0].value == (2 << 8 | 0) && charged_skills(caster.character.items).empty());
+        caster.pmode = -1;
+        world.apply(cmd::UseSkill{ fire_bolt, aim_x, aim_y, -1, false, 9001 }, cast_ms);
+        assert(caster.charge.item == -1 && world.fight.skill_level(fire_bolt) == 0);
+        caster.character.items = saved_items;
+    }
 
     // A healer's / well's cure (FUN_00578d30 / FUN_00585720): poison and the
     // curses go, chill stays; a thawing potion's takes the chill.

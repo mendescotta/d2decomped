@@ -212,6 +212,7 @@ struct Tables {
     std::vector<Superior> superior;
     std::vector<std::string> skill_itype;                  // Skills.txt itypea1 by Id (staffmods)
     std::vector<std::pair<int, int>> skill_levels;         // Skills.txt reqlevel, maxlvl by Id (FUN_00644710 / FUN_004aa8b0)
+    std::vector<std::pair<int, int>> skill_costs;          // Skills.txt cost mult, cost add by Id (+0x234 / +0x238: a charge's repair, FUN_00628d30)
     std::array<int, 7> class_first_skill{};                // per class its first skill Id (FUN_006460f0)
     std::vector<Special> uniques, sets;
     std::vector<std::string> item_order;                  // item codes in the Items table's order (weapons, armor, misc)
@@ -434,18 +435,52 @@ inline bool restocks(const Tables& tables, const d2d::d2s::Item& item) {
     return base != tables.item_base.end() && base->second.stackable && info != tables.item_info.end() && info->second.kind == 2;
 }
 
+// What an item's missing charges add to its repair (FUN_00628d30, called
+// with 10000 by FUN_0062efb0): each stat 204 below its max, (max - left) x
+// (cost mult x (level + 2 + reqlevel / 6 x 2) x 10000 / 1024 + cost add)
+// / max, Skills.txt's cost mult / cost add (+0x234 / +0x238) and reqlevel
+// (+0x174). Not an ethereal item's (FUN_0062a8d0, item flag 0x400000).
+inline int charges_repair_cost(const Tables& tables, const d2d::d2s::Item& item) {
+    if (item.ethereal) return 0;
+    int cost = 0;
+    for (const auto& prop : item.props) {
+        const int skill = prop.param >> 6, level = prop.param & 63, left = prop.value & 255, most = prop.value >> 8;
+        if (prop.stat != d2d::d2s::kChargedSkill || left >= most || skill < 0 || std::size_t(skill) >= tables.skill_costs.size()) continue;
+        const auto [mult, add] = tables.skill_costs[std::size_t(skill)];
+        const int reqlevel = std::size_t(skill) < tables.skill_levels.size() ? tables.skill_levels[std::size_t(skill)].first : 0;
+        const long long scaled = (level + 2 + reqlevel / 6 * 2) * 10000LL;
+        const long long each = (scaled < 0x10000 || mult == 0 ? mult * scaled / 1024 : scaled / 1024 * mult) + add;
+        cost += int((most - left) * each / most);
+    }
+    return cost;
+}
+// A repair's recharge (FUN_0055fe80, after FUN_005761c0's durability; the
+// cube's recharge flag 0x400, FUN_00565ab0): each stat 204 below its max
+// back to max (FUN_0065c940). True if any was.
+inline bool recharge(d2d::d2s::Item& item) {
+    bool any = false;
+    for (auto& prop : item.props)
+        if (const int left = prop.value & 255, most = prop.value >> 8; prop.stat == d2d::d2s::kChargedSkill && left < most) { prop.value = most << 8 | most; any = true; }
+    return any;
+}
+
 // Repair cost at the NPC (FUN_0062efb0 mode 3): the buy base with its
 // quality extras, times missing / max durability, times npc.txt rep mult
-// and the quest rep mults / 1024; 0 when there's nothing to repair.
+// and the quest rep mults / 1024, then the missing charges'
+// (charges_repair_cost, after the mults); 0 when there's nothing to repair.
 // A stack that restocks pays for its missing quantity instead (its base
 // a unit's, its durability free). Ethereal items can't be repaired.
-// ponytail: no charge recharging or socket terms.
+// ponytail: no socket terms.
 inline int repair_cost(const Tables& tables, const d2d::d2s::Item& item, const std::string& npc_id, const d2d::d2s::Header& header, int reduced = 0) {
     const int max = max_durability(item);
     const bool restock = restocks(tables, item);
     const auto found = tables.item_base.find(item.code);
     const int max_stack = found != tables.item_base.end() ? std::max(found->second.max_stack, 1) : 1;
-    if (item.ethereal || (restock ? item.quantity >= max_stack : item.max_durability <= 0 || item.durability >= max || indestructible(item))) return 0;
+    if (item.ethereal) return 0;
+    if (restock ? item.quantity >= max_stack : item.max_durability <= 0 || item.durability >= max || indestructible(item)) {
+        const int charges = charges_repair_cost(tables, item);
+        return charges > 0 ? int(price_reduced(charges, reduced)) : 0;
+    }
     const int base = found != tables.item_base.end() ? found->second.cost : 0;
     auto extra = [&](const std::vector<std::pair<int, int>>& costs, int index) {
         if (index < 0 || std::size_t(index) >= costs.size()) return 0;
@@ -472,7 +507,7 @@ inline int repair_cost(const Tables& tables, const d2d::d2s::Item& item, const s
             if (prices.qflag[std::size_t(quest)] && (header.quest_flag(diff, prices.qflag[std::size_t(quest)], 0) || header.quest_flag(diff, prices.qflag[std::size_t(quest)], 1)))
                 cost = cost * prices.qrep[std::size_t(quest)] / 1024;
     }
-    return int(price_reduced(cost, reduced));
+    return int(price_reduced(cost + charges_repair_cost(tables, item), reduced));
 }
 
 // Paying (FUN_00576d90): the purse first, then the stash; nothing taken
@@ -496,6 +531,7 @@ inline bool store_repair(const Tables& tables, const Store& store, d2d::d2s::Ite
     if (restocks(tables, item)) item.quantity = tables.item_base.at(item.code).max_stack;
     item.durability = max_durability(item);
     item.flags &= ~0x100u;
+    recharge(item);
     return true;
 }
 

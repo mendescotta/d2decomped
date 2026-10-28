@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <variant>
 #include <vector>
 
 using namespace d2d::game;
@@ -24,6 +25,12 @@ int main() try {
         const auto back = decode(bytes);
         assert(back && back->index() == command.index());
         assert(encode(*back) == bytes);                      // same fields: the same bytes
+    }
+    // A charged entry's cast keeps its item.
+    {
+        const auto back = decode(encode(cmd::UseSkill{ 54, 3.f, 4.f, -1, false, 812 }));
+        const auto* use = back ? std::get_if<cmd::UseSkill>(&*back) : nullptr;
+        assert(use && use->skill == 54 && use->item == 812 && !use->left);
     }
     // Through the transport, in order.
     LocalTransport transport;

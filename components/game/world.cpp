@@ -2575,6 +2575,18 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
             return;
         }
         const auto& use_skill = std::get<cmd::UseSkill>(command);
+        // A charged entry's cast (UseSkill::item): only while the entry is
+        // there, its item active with charges left (FUN_00647840; a client
+        // with none starts nothing, FUN_004c6140). Its level and cost go
+        // with the cast, so they change only between casts.
+        ChargedSkill entry;
+        if (use_skill.item >= 0) {
+            const auto entries = charged_skills(actor->character.items);
+            const auto found = std::ranges::find_if(entries, [&](const ChargedSkill& had) { return had.item == use_skill.item && had.skill == use_skill.skill; });
+            if (found == entries.end()) { if (actor->pmode < 0) actor->charge = {}; return; }
+            entry = *found;
+        }
+        if (actor->pmode < 0) actor->charge = entry;
         const auto* skill = game_data->skills.get(use_skill.skill);
         const int monster_index = fight.monster_index(use_skill.unit);
         const bool live = monster_index >= 0 && fight.monsters[std::size_t(monster_index)].targetable();

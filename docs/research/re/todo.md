@@ -25,7 +25,6 @@ Ranked by Seen, then by how much play it touches.
 | # | What | Kind | Seen | Where / notes |
 |---|---|---|---|---|
 | 1 | Nobody has played an act end to end by play: the quest tests set each quest up with debug verbs. A play bot (clicks only) would give the real gap list | check | yes | PLAN.md "Checkpoint 2026-10-14 (later)", `tests/play_d2d.py` (planned) |
-| 4 | Item charges as skills. Traced 2026-10-26: stat 0xcc param skill << 6 \| level, value max << 8 \| left; a cast takes one from the skill entry's item (`FUN_0056bec0`: `FUN_0065c820` finds the item or a socketed one, sound 0x3a5, 0x3e stat packet), usable while left > 0 (`FUN_00647840`); the client's 0x3e copy `FUN_004c1e40`; repair prices the missing charges (`FUN_00628d30`). Not yet: where worn items add their skill entries, the picker, the tooltip line | build | yes | fight.hpp `skill_base_level`, item_text.hpp:237 |
 | 5 | MonEquip.txt is hardcoded to Blood Raven's bow; the Valkyrie's gear by skill level (rows by `level`) isn't rolled | build | maybe | objgroups.cpp:552; pets.hpp |
 | 6 | MonItemPercent.txt (TreasureClassPercent 20: a monster's own gear dropping) isn't read | check | maybe | Matters once #5 gives monsters gear |
 | 7 | The Council's S1 shot: its mode event isn't traced (fires MissS1 at once) | trace | maybe | quests-act3.md, PLAN.md "Checkpoint 2026-10-14" |

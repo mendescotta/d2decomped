@@ -296,8 +296,8 @@ inline std::string cube_type_item(const Tables& tables, const std::string& type,
 // `uns` / `rem` items come back out of their sockets (rem only: as items).
 // The portals (kinds 1..3) are World::transmute's (rules::CainQuest::cow_portal_opens).
 // ponytail (cube.md "Gaps"): forced pre= /
-// suf=, crafted (made rare, then called crafted), mod's new base stats,
-// rch's charges and the transmute's sound aren't game.exe's yet.
+// suf=, crafted (made rare, then called crafted), mod's new base stats
+// and the transmute's sound aren't game.exe's yet.
 struct CubeMade { std::vector<d2d::d2s::Item> items; bool made = false; };
 inline CubeMade cube_make(const Tables& tables, const CubeRecipe& recipe, const CubeMatch& match, const std::vector<const d2d::d2s::Item*>& cube, int clvl,
                           bool expansion, int difficulty, Rng& game_seed, std::vector<bool>* found_uniques) {
@@ -359,6 +359,7 @@ inline CubeMade cube_make(const Tables& tables, const CubeRecipe& recipe, const 
             if (stackable && output.qty) item.quantity = std::min(output.qty, base->second.max_stack);
             if (item.max_durability > 0) item.durability = item.max_durability;
         }
+        if (output.flags & kRecharge) recharge(item);   // FUN_00565ab0's flag 0x400: FUN_0055fe80
         if (!(output.flags & kSock)) {
             if (output.qty && stackable) item.quantity = std::min(output.qty, base->second.max_stack);
         } else if (output.qty && item.sockets == 0 && !item.socketed) {

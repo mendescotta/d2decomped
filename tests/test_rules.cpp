@@ -245,6 +245,23 @@ int main() {
     assert(store_repair(tables_copy, smith, worn, wallet) && worn.durability == 40 && wallet.get(kGold) == 0 && wallet.get(kGoldBank) == 25);
     worn.durability = 0;
     assert(!store_repair(tables_copy, smith, worn, wallet) && worn.durability == 0);   // 500 > 25: can't pay
+    // Missing charges (FUN_00628d30, called with 10000): missing / max of
+    // cost mult x (level + 2 + reqlevel / 6 x 2) x 10000 / 1024 + cost add,
+    // after the rep mult; none on an ethereal item. Skill 54 at level 3,
+    // reqlevel 18: 110000 / 1024 = 107, x 256 + 100 = 27492; 5 of 10 gone.
+    tables_copy.skill_costs.assign(55, { 0, 0 }); tables_copy.skill_costs[54] = { 256, 100 };
+    tables_copy.skill_levels.assign(55, { 0, 0 }); tables_copy.skill_levels[54] = { 18, 20 };
+    const std::vector<d2d::d2s::ItemProp> half_charged{ { .stat = 204, .param = 54 << 6 | 3, .value = 10 << 8 | 5 } };
+    Item wand = whole; wand.props = half_charged;
+    assert(charges_repair_cost(tables_copy, wand) == 5 * 27492 / 10 && repair_cost(tables_copy, wand, "Charsi", header) == 5 * 27492 / 10);
+    Item worn_wand = worn; worn_wand.durability = 10; worn_wand.props = half_charged;
+    assert(repair_cost(tables_copy, worn_wand, "Charsi", header) == 1000 * 30 / 40 / 2 + 5 * 27492 / 10);
+    Item ghost_wand = wand; ghost_wand.ethereal = true;
+    assert(repair_cost(tables_copy, ghost_wand, "Charsi", header) == 0);
+    // The repair refills them (FUN_0055fe80): left back to max.
+    wallet.values[kGold] = 20000;
+    assert(store_repair(tables_copy, smith, wand, wallet) && wand.props[0].value == (10 << 8 | 10) && wallet.get(kGold) == 20000 - 5 * 27492 / 10);
+    assert(repair_cost(tables_copy, wand, "Charsi", header) == 0 && !recharge(wand));
 
     // Healing raises life/mana to max, never lowers gear-boosted values.
     d2d::d2s::Stats hurt;

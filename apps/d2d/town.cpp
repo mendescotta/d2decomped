@@ -388,7 +388,7 @@ auto Town::publish() -> void {
         character.header = view.header; character.stats = view.stats; character.items = view.items;
         // A weapon switch brought the other set's skills: the buttons take them.
         if (int(view.header.weapon_set) != skillbar_set) {
-            skillbar.left = int(view.header.left_skill); skillbar.right = int(view.header.right_skill);
+            skillbar.left = int(view.header.left_skill); skillbar.right = int(view.header.right_skill); skillbar.left_item = skillbar.right_item = -1;
             skillbar_set = int(view.header.weapon_set);
         }
         character.expansion = view.header.expansion();
@@ -1138,6 +1138,7 @@ auto Town::update(std::vector<std::uint8_t>& framebuffer, const Mouse& frame_mou
         now_ms = frame_ms;
         skillbar.coop = world.players.size() > 1;           // Resurrect on the right-hand picker
         if (skillbar.right == kResurrectSkill && !skillbar.usable(kResurrectSkill, false)) skillbar.right = 0;   // co-op over: Attack
+        skillbar.drop_gone();                                       // a charged entry used up or taken off
         // A partner's screen with nothing of theirs open goes back to the first player.
         if (focus_id() != hero.id && focus_keys.empty() && pad_field() && !game_menu.open && !automap.open && !waypoint.open) take_focus(hero.id);
         auto keys_this_frame = frame_keys;               // and a partner's that took the screen
@@ -1961,25 +1962,25 @@ auto Town::input(const Mouse& mouse, bool over_ui) const -> std::vector<Command>
         const int hovered_monster_index = hovered_monster();
         const bool live = hovered_monster_index >= 0 && view.monsters[std::size_t(hovered_monster_index)].alive();
         if (mouse.press_this_frame) {
-            if (live) out.push_back(cmd::UseSkill{ skillbar.left, world_x, world_y, view.monsters[std::size_t(hovered_monster_index)].id, true });
+            if (live) out.push_back(cmd::UseSkill{ skillbar.left, world_x, world_y, view.monsters[std::size_t(hovered_monster_index)].id, true, skillbar.left_item });
             else if (hovered_ground() >= 0) out.push_back(cmd::Pickup{ view.ground[std::size_t(hovered_ground())].id });
             else if (hovered_npc >= 0 || (hovered_npc <= -2000 && hovered_npc > -2000 - int(d2d::game::World::kGamePortals)) || (hovered_npc <= -3000 && hovered_npc > -3016)
                      || (hovered_npc <= -4000 && hovered_npc > -4000 - int(view.others.size())))
                 out.push_back(cmd::Interact{ hovered_npc });
-            else if (function_held(keys::kStandStill)) out.push_back(cmd::UseSkill{ skillbar.left, world_x, world_y, -1, true });   // 0x7a0664: no step, the skill there
+            else if (function_held(keys::kStandStill)) out.push_back(cmd::UseSkill{ skillbar.left, world_x, world_y, -1, true, skillbar.left_item });   // 0x7a0664: no step, the skill there
             else out.push_back(cmd::Move{ world_x, world_y, true });
         } else if (mouse.down) {                             // held: the attack goes on, else the walk re-aims
             if (const int attacked = view.monster(view.attack); attacked >= 0 && view.monsters[std::size_t(attacked)].alive())
-                out.push_back(cmd::UseSkill{ view.attack_skill, world_x, world_y, view.attack, true });
+                out.push_back(cmd::UseSkill{ view.attack_skill, world_x, world_y, view.attack, true, view.attack_skill == skillbar.left ? skillbar.left_item : -1 });
             else if (function_held(keys::kStandStill))
-                out.push_back(cmd::UseSkill{ skillbar.left, world_x, world_y, -1, true });
+                out.push_back(cmd::UseSkill{ skillbar.left, world_x, world_y, -1, true, skillbar.left_item });
             else
                 out.push_back(cmd::Move{ world_x, world_y, false });
         }
         if (mouse.rpress_this_frame && skillbar.right == kResurrectSkill) {   // co-op: the body nearest the click
             if (const auto* body = body_near(world_x, world_y, 1.5f)) out.push_back(cmd::UseSkill{ kResurrectSkill, body->x, body->y, body->id });
         } else if (mouse.rpress_this_frame) {
-            out.push_back(cmd::UseSkill{ skillbar.right, world_x, world_y, live ? view.monsters[std::size_t(hovered_monster_index)].id : -1 });
+            out.push_back(cmd::UseSkill{ skillbar.right, world_x, world_y, live ? view.monsters[std::size_t(hovered_monster_index)].id : -1, false, skillbar.right_item });
         }
         return out;
     }
@@ -2034,7 +2035,7 @@ auto Town::pad_pick(const PadPlayer& player_pad, const UnitState& unit, bool use
 // pick up / talk to what is, else swing that way. Nothing is latched: a
 // released button forgets its target. The aiming stick turns the facing
 // (and so the target) without walking; else the walk does.
-auto Town::pad_act(PadPlayer& player_pad, const UnitState& unit, bool dead, bool field, int left_skill, int right_skill, const Send& out) -> void {
+auto Town::pad_act(PadPlayer& player_pad, const UnitState& unit, bool dead, bool field, int left_skill, int right_skill, const Send& out, int left_item, int right_item) -> void {
         const auto& move = player_pad.move;
         if (move.aim || move.active) {
             const auto face = move.aim ? pad::world_step(move.aim_x, move.aim_y, kIsoW, kIsoH, 1.f) : pad::world_step(move.x, move.y, kIsoW, kIsoH, 1.f);
@@ -2048,11 +2049,11 @@ auto Town::pad_act(PadPlayer& player_pad, const UnitState& unit, bool dead, bool
             return;
         }
         const bool left = !move.alt;
-        const int skill = left ? left_skill : right_skill;
+        const int skill = left ? left_skill : right_skill, item = left ? left_item : right_item;
         const PadPick pick = pad_pick(player_pad, unit, left && move.attack, pad_aim(skill, move.aim || move.active));
         if (pick.kind == PadPick::kMonster) {
             player_pad.target = pick.id;
-            out(cmd::UseSkill{ skill, pick.x, pick.y, pick.id, left });
+            out(cmd::UseSkill{ skill, pick.x, pick.y, pick.id, left, item });
             return;
         }
         player_pad.target = -1;
@@ -2062,7 +2063,7 @@ auto Town::pad_act(PadPlayer& player_pad, const UnitState& unit, bool dead, bool
         // Nothing in reach: the left skill swings only with a monster about (in camp A never just walks); the right one always casts (buffs, teleport).
         const bool foe_near = std::ranges::any_of(view.monsters, [&](const auto& foe) { return foe.alive() && std::hypot(foe.unit.x - hero_x, foe.unit.y - hero_y) < 10.f; });
         if (move.alt || (move.attack && foe_near))
-            out(cmd::UseSkill{ skill, hero_x + face_x * 3.f, hero_y + face_y * 3.f, -1, left });
+            out(cmd::UseSkill{ skill, hero_x + face_x * 3.f, hero_y + face_y * 3.f, -1, left, item });
     }
 
 auto Town::pad_walk(PadPlayer& player_pad, const UnitState& unit, bool dead, bool field, const Send& out) -> void {
@@ -2101,7 +2102,7 @@ auto Town::lead_leaves() -> int {
         static_cast<Character&>(character) = hero.character;
         character.hardcore = hero.character.header.hardcore();
         character.selected = kSaveClassToUi[std::clamp(int(hero.character.header.cls), 0, 6)];
-        skillbar.left = int(hero.character.header.left_skill); skillbar.right = int(hero.character.header.right_skill);
+        skillbar.left = int(hero.character.header.left_skill); skillbar.right = int(hero.character.header.right_skill); skillbar.left_item = skillbar.right_item = -1;
         skillbar_set = int(hero.character.header.weapon_set);
         const int seat = next->seat;
         lead_colour = next->colour;
@@ -2297,7 +2298,7 @@ auto Town::take_focus(int id) -> void {
         static_cast<Character&>(character) = owner.character;
         character.hardcore = owner.character.header.hardcore();
         character.selected = kSaveClassToUi[std::clamp(int(owner.character.header.cls), 0, 6)];
-        skillbar.left = int(owner.character.header.left_skill); skillbar.right = int(owner.character.header.right_skill);
+        skillbar.left = int(owner.character.header.left_skill); skillbar.right = int(owner.character.header.right_skill); skillbar.left_item = skillbar.right_item = -1;
         skillbar_set = int(owner.character.header.weapon_set);
         quest_log.sent_known = false;
         pad = {};
@@ -2316,7 +2317,7 @@ auto Town::pad_focus() const -> std::optional<PadFocus> {
             const auto rows = skillbar.rows(on_left);
             for (std::size_t row = 0; row < rows.size(); ++row)
                 for (std::size_t col = 0; col < rows[row].size(); ++col)
-                    if (rows[row][col] == (on_left ? skillbar.left : skillbar.right)) {
+                    if (rows[row][col] == skillbar.hand(on_left)) {
                         const auto [x, y] = skillbar.picker_at(rows, on_left, int(row), int(col));
                         return PadFocus{ 3000 + skillbar.picking, x + SkillBar::kIcon / 2, y - SkillBar::kIcon / 2 };
                     }
@@ -2787,7 +2788,7 @@ auto Town::walk(const Mouse& mouse, bool over_ui, Audio& audio, std::uint32_t fr
         const Send to_world = [this](const Command& command) { send(command); };
         const bool field = pad_field() && !game_menu.open && !chat_typing && !gold_box;
         pad_walk(pad, focused().player, view.dead && !view.ghost, field, to_world);   // a ghost walks
-        pad_act(pad, focused().player, view.dead, pad_field(), skillbar.left, skillbar.right, to_world);
+        pad_act(pad, focused().player, view.dead, pad_field(), skillbar.left, skillbar.right, to_world, skillbar.left_item, skillbar.right_item);
         // Fixed ticks of kTickMs; after a stall, a few to catch up, then the
         // clock skips ahead (game.exe catches up one frame at most).
         if (world_ms == 0 || frame_ms - world_ms > 1000) world_ms = frame_ms - std::min<std::uint32_t>(frame_ms - last_ms, kTickMs);

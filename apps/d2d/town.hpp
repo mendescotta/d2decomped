@@ -251,7 +251,7 @@ struct Town {
     bool pad_cue = false;                         // the field plays by pad: the cursor's hover is A's pick (main sets it)
     pad::Family pad_family = pad::Family::Xbox;   // the screen's pad's button labels (main sets it)
     void draw_pad_hint(std::vector<std::uint8_t>& framebuffer) const;
-    void pad_act(PadPlayer& player_pad, const UnitState& unit, bool dead, bool field, int left_skill, int right_skill, const Send& out);
+    void pad_act(PadPlayer& player_pad, const UnitState& unit, bool dead, bool field, int left_skill, int right_skill, const Send& out, int left_item = -1, int right_item = -1);   // the items: the hands' charged entries
     // Local co-op's other players at this screen (seats 1..3,
     // docs/design/local-coop.md): their World player (id 0 while their
     // roster is up), pad and orders.

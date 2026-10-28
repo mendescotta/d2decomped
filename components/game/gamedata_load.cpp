@@ -1075,6 +1075,8 @@ void load_tables(GameData& game_data, const d2d::mpq::Stack& mpqs) {
                 game_data.rules.skill_itype[id] = std::string(table.get(row, "itypea1"));
                 if (id >= game_data.rules.skill_levels.size()) game_data.rules.skill_levels.resize(id + 1);
                 game_data.rules.skill_levels[id] = { std::atoi(std::string(table.get(row, "reqlevel")).c_str()), std::atoi(std::string(table.get(row, "maxlvl")).c_str()) };
+                if (id >= game_data.rules.skill_costs.size()) game_data.rules.skill_costs.resize(id + 1);
+                game_data.rules.skill_costs[id] = { std::atoi(std::string(table.get(row, "cost mult")).c_str()), std::atoi(std::string(table.get(row, "cost add")).c_str()) };
             }
         }
         const auto charstats_table = txt("CharStats");

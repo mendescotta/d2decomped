@@ -113,7 +113,8 @@ inline bool finisher(const d2d::rules::Skill* skill) {
 // then with what the gear gives (gear_props: worn, socketed, set bonuses,
 // charms) and `extra` (the skill shrine's +all skills) — on skills that
 // have points or that an item grants (rules::item_grants_skill).
-// ponytail: other general skills and item charges don't count yet.
+// ponytail: other general skills don't count yet. A charged entry is
+// cast at its own level (World's fight.skill_level, Hero::charge).
 inline int skill_base_level(const GameData& game_data, const Character& character, int id) {
     const auto& ids = game_data.skills.class_ids[std::size_t(std::max(character.character_class, 0))];
     if (const auto found = std::ranges::find(ids, id); found != ids.end()) return character.stats.skills[std::size_t(found - ids.begin())];
@@ -248,6 +249,7 @@ struct Fight {
         // and the strikes still to come (Dragon Talon's kicks, Zeal's hits).
         int   attack_skill = 0, swing_skill = 0, kicks_left = 0;
         bool  item_cast = false;              // swing_skill is cast from an item (a scroll): its ItemCastSound
+        ChargedSkill charge;                  // the charged entry the cast came from (UseSkill::item; item -1 none): its level, a charge for its cost
         int   struck_class = 0;               // the last hit on the player's hit class (unit +0xb0): its impact on GH / DT
         int   shown_class = 0;                // the hit class the client last had, any landed hit's (GH or S->C 0x0c): its block sound
         std::int64_t self_hurt = 0;            // life (256ths) the player's own skills cost (Sacrifice), taken with the monsters' hits
@@ -1020,6 +1022,11 @@ struct Fight {
     // no mana, anywhere but in town (checkfunc 5).
     bool cast_scroll(int skill, std::uint32_t now_ms);
     bool cast(int skill, std::uint32_t now_ms);
+    // A cast's cost (FUN_0056bfe0): a charged entry's (Hero::charge, for
+    // that skill) is a charge and no mana, else the skill's mana.
+    [[nodiscard]] bool charged(int skill) const;
+    [[nodiscard]] int cost_of(const d2d::rules::Skill& skill, int lvl) const;
+    void pay(const d2d::rules::Skill& skill, int cost);
     // Frenzy's state (FUN_005d8c70): each hit that lands raises it a level,
     // up to the skill's, for auralencalc ticks; its aurastats (velocitypercent
     // dm34, attackrate dm56) are taken at that level.

@@ -99,7 +99,7 @@ void register_game_verbs(d2d::devctl::Channel& channel, Window& win, Screen& scr
         auto int_arg = [&](std::size_t index, int fallback = -1) { return index < verb_args.size() ? std::atoi(verb_args[index].c_str()) : fallback; };
         const std::string verb = verb_args.size() > 1 ? verb_args[1] : "";
         if (verb == "move" && verb_args.size() >= 4) town.send(cmd::Move{ float_arg(2), float_arg(3), true });
-        else if (verb == "skill" && verb_args.size() >= 5) town.send(cmd::UseSkill{ int_arg(2, 0), float_arg(3), float_arg(4), int_arg(5), int_arg(6, 0) != 0 });
+        else if (verb == "skill" && verb_args.size() >= 5) town.send(cmd::UseSkill{ int_arg(2, 0), float_arg(3), float_arg(4), int_arg(5), int_arg(6, 0) != 0, int_arg(7) });
         else if (verb == "interact" && verb_args.size() >= 3) town.send(cmd::Interact{ int_arg(2) });
         else if (verb == "pickup" && verb_args.size() >= 3) town.send(cmd::Pickup{ int_arg(2) });
         else if (verb == "resurrect") town.send(cmd::Resurrect{});
@@ -695,7 +695,7 @@ void register_game_verbs(d2d::devctl::Channel& channel, Window& win, Screen& scr
             const int id = std::atoi(args[3].c_str());
             const bool left = args[2] == "left";
             if (!town.skillbar.usable(id, left)) return std::string("err not usable\n");
-            (left ? town.skillbar.left : town.skillbar.right) = id;
+            town.skillbar.choose(left, { id, -1 });
             return std::string("ok\n");
         }
         if (args.size() >= 3 && (args[1] == "statpts" || args[1] == "skillpts")) {   // grant unspent points
