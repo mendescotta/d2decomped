@@ -176,12 +176,12 @@ def check_python(tree, changed, numbers):
 
 def wait_for_other_builds(limit_s=1800):
     """One build at a time: two at once on a 15 GB machine got cc1plus
-    OOM-killed. Wait while this user's compiler or clang-tidy runs (not
-    `ld`: any linker on the machine, other projects' too)."""
+    OOM-killed. Wait while a compiler or clang-tidy runs, a docker build's
+    (root's) too; not `ld`, which any project's link matches."""
     import time
     waited = 0
     while shutil.which("pgrep"):
-        running = subprocess.run(["pgrep", "-l", "-u", str(os.getuid()), "-x", "cc1plus|clang-tidy"],
+        running = subprocess.run(["pgrep", "-l", "-x", "cc1plus|clang-tidy"],
                                  capture_output=True, text=True, check=False).stdout.split("\n")
         running = [row for row in running if row]
         if not running:
