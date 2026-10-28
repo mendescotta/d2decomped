@@ -4,6 +4,7 @@
 
 #include "ai.hpp"
 #include "character.hpp"
+#include "cues.hpp"
 #include "fight.hpp"
 #include "gamedata.hpp"
 #include "inventory.hpp"

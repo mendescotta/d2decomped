@@ -4,6 +4,7 @@
 #include <sound_start.hpp>
 
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <vector>
 

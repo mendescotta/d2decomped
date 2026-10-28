@@ -24,6 +24,7 @@
 #include "world_view.hpp"
 
 #include <combat.hpp>
+#include <cues.hpp>
 #include <d2gs/c2s.hpp>
 #include <d2s_items.hpp>
 #include <level_ids.hpp>
