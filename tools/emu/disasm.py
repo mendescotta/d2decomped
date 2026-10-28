@@ -1,10 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Disassemble game.exe by address, without Ghidra.
 
-    uv run python disasm.py 623f50              # from 0x623f50 to its ret
+    uv run python disasm.py 623f50              # from 0x623f50 to the function's end
     uv run python disasm.py 623f50 200          # 200 instructions
     uv run python disasm.py --all out.txt       # every executable section, a line an instruction
     uv run python disasm.py --exe PATH ...      # another game.exe than the MPQ folder's bin/game.exe
+
+Without COUNT it stops at the `ret` that ends the function: one followed by
+0xCC padding or the next function's `push ebp; mov ebp, esp`. A `ret` inside
+it (an early return, a switch arm) doesn't stop it.
 
 A line is `address  mnemonic operands`, so `--all`'s file greps for an
 immediate (a string's address, a table's) or an instruction shape. It's a
@@ -17,6 +21,13 @@ import capstone
 import pefile
 
 from emu import data_path
+
+
+def ends_function(image, base, ins):
+    """A `ret` followed by 0xCC padding or the next `push ebp; mov ebp, esp`:
+    the function's end, not an early return."""
+    after = ins.address + ins.size - base
+    return ins.mnemonic == "ret" and (after >= len(image) or image[after] == 0xCC or image[after:after + 3] == b"\x55\x8b\xec")
 
 
 def main():
@@ -62,11 +73,12 @@ def main():
     for done, ins in enumerate(md.disasm(image[va - base:], va), 1):   # stops at the image's end or a byte it can't decode
         print(f"{ins.address:08x}  {ins.mnemonic:7} {ins.op_str}")
         end = ins.address + ins.size
-        if (count and done >= count) or (not count and ins.mnemonic.startswith("ret")):
+        if (count and done >= count) or (not count and ends_function(image, base, ins)):
             return
     if end - base < len(image):
         sys.exit(f"disasm: stopped at {end:08x}, a byte capstone can't decode")
     sys.exit(f"disasm: reached the image's end at {end:08x}")
+
 
 if __name__ == "__main__":
     main()

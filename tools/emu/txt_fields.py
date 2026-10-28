@@ -29,6 +29,7 @@ import capstone
 import pefile
 from capstone import x86
 
+from disasm import ends_function
 from emu import data_path
 
 
@@ -68,10 +69,8 @@ def stores(pe, start):
     md.detail = True
     regs, out = {}, []
     for ins in md.disasm(image[start - base:start - base + 0x10000], start):
-        if ins.mnemonic == "ret":                        # the function's end: padding or the next one next
-            after = ins.address + ins.size - base
-            if image[after] == 0xCC or image[after:after + 3] == b"\x55\x8b\xec":
-                break
+        if ends_function(image, base, ins):
+            break
         ops = ins.operands
         if ins.mnemonic == "mov" and len(ops) == 2 and ops[0].type == x86.X86_OP_REG:
             regs[ins.reg_name(ops[0].reg)] = ops[1].imm if ops[1].type == x86.X86_OP_IMM else None
@@ -124,9 +123,9 @@ def refs_to(pe, va):
     image, base = pe.get_memory_mapped_image(), pe.OPTIONAL_HEADER.ImageBase
     needle, out, at = struct.pack("<I", va), [], 0
     while (at := image.find(needle, at)) >= 0:
-        if at >= 6 and image[at - 6] == 0xC7 and image[at - 5] in (0x85, 0x45):
+        if at >= 6 and image[at - 6] == 0xC7 and image[at - 5] == 0x85:          # mov [ebp + disp32], imm32
             out.append(base + at - 6)
-        elif at >= 3 and image[at - 3] == 0xC7 and image[at - 2] == 0x45:
+        elif at >= 3 and image[at - 3] == 0xC7 and image[at - 2] == 0x45:          # mov [ebp + disp8], imm32
             out.append(base + at - 3)
         at += 1
     return out
