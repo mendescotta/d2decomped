@@ -230,7 +230,7 @@ def docker_command(command):
 
 # CI's readability-identifier-length (.clang-tidy): 3+ letters, except these.
 # A fast stand-in that runs in --quick too (#93's test `at`, #92's `c`).
-SHORT_NAME = re.compile(r"(?:\b(?:auto|int|float|bool|double|std::\w+|std::size_t|unsigned|char)\b[&*\s]+|\bconst\s+\w+[&*\s]+)"
+SHORT_NAME = re.compile(r"(?:\b(?:auto|int|float|bool|double|std::\w+(?:<[^;={}()]*>)?|std::size_t|unsigned|char)(?:\b|(?<=>))[&*\s]+|\bconst\s+\w+[&*\s]+)"
                         r"([A-Za-z_]\w?)\s*(?:=|\{|;|:(?!:))")
 SHORT_OK = re.compile(r"^(x|y|dx|dy|id|ok)$")             # IgnoredVariableNames
 LOOP_OK = re.compile(r"^([ijkxy]|\w\w)$")                 # a for-init counter: IgnoredLoopCounterNames, or 2+ letters
@@ -275,6 +275,17 @@ def check_cpp(tree, changed, numbers, build, quick, docker):
         report("FAIL" if run.returncode else "ok", "validate-linux", f"exit {run.returncode}")
         return run.returncode == 0
     build.mkdir(parents=True, exist_ok=True)
+    # an interrupted build can leave 0-byte files that ninja and FFmpeg's "built" stamp
+    # still trust: video.hpp fails with "AVCodecContext does not name a type", a link with
+    # "archive has no index". Dropping only the FFmpeg prefix isn't enough (its
+    # ExternalProject stamps then skip configure), so start the build dir over.
+    empty = [f for pattern in ("ffmpeg-*/include/**/*.h", "**/*.a", "**/*.o")
+             for f in build.glob(pattern) if f.is_file() and f.stat().st_size == 0]
+    if empty:
+        report("WARN", "build-dir", f"{len(empty)} empty files (an interrupted build, e.g. {empty[0].relative_to(build)}); "
+                                    f"removed {build.name}, building from scratch")
+        shutil.rmtree(build)
+        build.mkdir(parents=True)
     configure = ["cmake", "-S", str(tree), "-B", str(build), "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release",
                  f"-DCMAKE_CXX_FLAGS={CI_FLAGS}", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", "-DD2D_BUILD_TESTS=ON"]
     with open(build / "presubmit-build.log", "w") as log:
@@ -332,7 +343,12 @@ def check_ctest(build, quick, docker, built):
                              stdout=log, stderr=subprocess.STDOUT, check=False)
     text = (build / "presubmit-ctest.log").read_text(errors="replace")
     summary = re.search(r"\d+% tests passed.*", text)
-    failed = re.findall(r"^\s*\d+ - (\S+) \(", text, re.M)
+    # ctest lists both under its "did not run" / "failed" footers as "N - name (Why)";
+    # a test that exits SKIP_RETURN_CODE (77) is "(Skipped)", not a failure
+    failed = re.findall(r"^\s*\d+ - (\S+) \((?!Skipped\))", text, re.M)
+    skipped = re.findall(r"^\s*\d+ - (\S+) \(Skipped\)", text, re.M)
+    if skipped:   # a skip means the data-backed checks didn't run
+        report("WARN", "ctest-skipped", f"{len(skipped)} skipped: {', '.join(skipped)}")
     if run.returncode and failed:
         # the d2d-driving tests (smoke_d2d) can fail when run beside each other;
         # one that passes alone is a WARN to rerun, not the branch's failure

@@ -25,9 +25,11 @@ class PresubmitTests(unittest.TestCase):
 
     def test_short_names_as_clang_tidy(self):
         flagged = {"        const std::uint32_t at = 26 * kTickMs;": "at", "    auto c = foo();": "c",
-                   "    const int n{3};": "n"}
+                   "    const int n{3};": "n", "        std::vector<Channel*> of;": "of",
+                   "    std::map<int, std::pair<int, int>> ab = {};": "ab"}
         allowed = ["    for (const auto& x : xs)", "    int row = 0;", "    for (std::size_t i = 0; i < n; ++i)",
-                   "    const auto& [a, b] = pair;", "    return a ? b : c;", "    bool ok = true;"]
+                   "    const auto& [a, b] = pair;", "    return a ? b : c;", "    bool ok = true;",
+                   "    std::vector<Instance> playing;", "    if (a < b && c > d) e = 1;"]
         for text, name in flagged.items():
             self.assertEqual([hit.group(1) for hit in presubmit.SHORT_NAME.finditer(text)], [name], text)
         for text in allowed:
@@ -94,6 +96,22 @@ class PresubmitTests(unittest.TestCase):
                                     "components/game/fight.cpp": [(3, "    hurt(player);")]})
         self.assertFalse([message for level, name, message in presubmit.results
                           if name == "siblings" and message.startswith("unit kinds")])
+
+    def test_ctest_skipped_is_not_failed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            build = Path(tmp)
+            (build / "CTestTestfile.cmake").write_text("")
+            log = ("The following tests did not run:\n\t  7 - test_monsters (Skipped)\n"
+                   "The following tests FAILED:\n\t 12 - test_game (Failed)\n")
+            orig = presubmit.subprocess.run
+            presubmit.subprocess.run = lambda *a, stdout=None, **k: (stdout.write(log), type("R", (), {"returncode": 8})())[1]
+            try:
+                presubmit.check_ctest(build, quick=False, docker=False, built=True)
+            finally:
+                presubmit.subprocess.run = orig
+        self.assertEqual(self.levels("ctest-skipped"), ["WARN"])
+        fails = [text for level, name, text in presubmit.results if name == "ctest" and level == "FAIL"]
+        self.assertTrue(fails and "test_game" in fails[0] and "test_monsters" not in fails[0], presubmit.results)
 
     def test_build_jobs_at_least_one(self):
         self.assertGreaterEqual(presubmit.build_jobs(), 1)
