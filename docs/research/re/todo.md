@@ -44,6 +44,9 @@ Ranked by Seen, then by how much play it touches.
 sounds play, 106 don't (2026-10-28). 97 of the 106 are traced as never
 played by stock 1.14d (rows 16, 18 and 19), so d2d plays 3,414 of the 3,423
 the original does (unit-sounds.md "In d2d").
+How sounds start and mix isn't ported yet (sound.md "Starting a sound",
+"Solo and the game menu"): Compound, Defer / Stop Inst, one line at a
+time per unit, the Solo duck to 70% and the menu's fade-out.
 
 | # | What | Count | Kind | Seen | Notes |
 |---|---|---|---|---|---|

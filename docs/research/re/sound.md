@@ -13,6 +13,54 @@ Rows are keyed by `Index`. `FileName` is relative to:
 
 `Volume` runs 0..255, and `Loop` marks looping sounds.
 
+The loaded record is 0x8e bytes (`FUN_00481950`'s field table): Volume
++0x3c, Group Size +0x3d, Loop +0x3e, Fade In +0x3f, Fade Out +0x40, Defer
+Inst +0x41, Stop Inst +0x42, Duration +0x43 (word), Compound +0x45 (word),
+Falloff +0x47, Reverb +0x4b, Cache +0x4c, Async Only +0x4d, Priority +0x4e,
+Stream +0x4f, Stereo +0x50, Tracking +0x51, Solo +0x52, Music Vol +0x53,
+Block 1..3 +0x54 / +0x58 / +0x5c; +0x60 is the group's first row, set
+at load. Times below are sound ticks: `DAT_007bc9bc`, +1 per
+`FUN_00482c20` (40 ms).
+
+## Starting a sound: Volume, Compound, Defer / Stop Inst
+
+`FUN_004b9a00` (ecx row, edx unit, then delay, ...) makes an instance:
+- Volume 0: nothing plays.
+- **Compound** ≠ 0: `FUN_004b9760` looks for a live instance of the same
+  group (record +0x60) that isn't stopping (instance +0x3d). Compound < 0
+  takes any; otherwise one started (instance +0x34) at most Compound ticks
+  ago. If there is one, no new instance is made: the play returns that
+  one, with the new unit added to its unit list (+0x28). 590 rows have
+  one (8 ticks for 380 of them, −1 for 49).
+- The instance's priority is Priority (+0x4e), +0x50 when the unit is the
+  local player.
+
+When it starts (`FUN_004ba020`, 0x4ba47a), the instance it clashes with is
+- for Defer or Stop Inst, the oldest other playing instance of its group:
+  on the same unit when it has one, anywhere when not (`FUN_004b9690`);
+- for a speech row (0xb76..0x1230) on a unit, any other speech playing on
+  that unit (`FUN_004b9700`), whatever its flags.
+
+With a clash, Stop Inst stops the old one and the new one plays; otherwise
+the new one is dropped. So a unit says one line at a time. A Defer Inst
+row with no unit and a position skips the clash and plays over whatever
+is playing. 2,049 rows defer and 1,444 stop.
+
+## Solo and the game menu: ducking
+
+Each sound tick `FUN_004ba020` (0x4ba68f) steps two volume percentages:
+- **Solo**: while any instance whose row is Solo (+0x52) plays and isn't
+  fading out, `DAT_00727568` goes 2 a tick down to 70, else 2 up to 100.
+  0x4dfd0b scales every non-Solo row's volume by it. The 1,273 Solo rows
+  are the speech: under a quest line or an NPC's, the rest of the game
+  plays at 70%.
+- **The game menu**: in game mode 0 / 1 (`DAT_007a0610`) with UI 9 or 0xb
+  up (the pause, menu.md), `DAT_00727564` goes 5 a tick down to 0, else 5
+  up to 100. 0x4dfcb2 scales every row by it except 1..0xf (cursor),
+  0x34..0x47 (`scene_*` ambience) and 0x1231..0x125a (music). The
+  instances keep running: under the pause the world's sounds fade out
+  while the ambience and the music play on, and fade back in after.
+
 ## Level music and ambience
 
 Levels.txt `SoundEnv` → SoundEnviron.txt row (`Index`):
