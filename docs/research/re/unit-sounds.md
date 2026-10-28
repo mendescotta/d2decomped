@@ -368,7 +368,9 @@ the View (`Audio::stop_owners`). States: `StateClock` in `dress()`. Footsteps:
 `Fight::sound_rng`, apart from the game's. In a joined game the host sends no
 MonSounds (game.exe's client makes them from the unit's mode), so
 `Town::net_overlay` runs each host monster through `Fight::monster_sounds`
-too: its mode from the host's unit command, its Init, Neutral and footsteps.
+too: its mode from the host's unit command, its Init (not a corpse's: one
+already dead as it comes waits), Neutral and footsteps. A monster the host
+removes is dropped, so one that comes back plays its Init again.
 The host's hit class isn't read, so a joined game's monsters play no impact
 on GH / KB / DT.
 Left: the player's quest lines, monsters' own skill stsound,

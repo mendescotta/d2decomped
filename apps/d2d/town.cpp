@@ -848,6 +848,10 @@ auto Town::net_overlay() -> void {
             world.fight.monster_sounds(monster, world_ms);
             view.monsters.push_back(monster);
         }
+        // A unit the host has removed is gone here too: one that comes back is
+        // a new unit, its Init again, as game.exe frees and makes it anew.
+        std::erase_if(net_monsters, [&](const auto& entry) { return !net_game->units.contains(std::uint64_t(1) << 32 | entry.first); });
+        std::erase_if(net_other_modes, [&](const auto& entry) { return !net_game->units.contains(entry.first); });
         std::ranges::move(world.cues.due, std::back_inserter(cues.due));
         world.cues.due.clear();
         // The host's ground items, named as d2d names its own (labels kept by id).
