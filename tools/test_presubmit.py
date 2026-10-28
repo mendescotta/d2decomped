@@ -26,13 +26,32 @@ class PresubmitTests(unittest.TestCase):
     def test_short_names_as_clang_tidy(self):
         flagged = {"        const std::uint32_t at = 26 * kTickMs;": "at", "    auto c = foo();": "c",
                    "    const int n{3};": "n"}
-        allowed = ["    for (const auto& x : xs)", "    int row = 0;", "    std::size_t i = 0;",
+        allowed = ["    for (const auto& x : xs)", "    int row = 0;", "    for (std::size_t i = 0; i < n; ++i)",
                    "    const auto& [a, b] = pair;", "    return a ? b : c;", "    bool ok = true;"]
         for text, name in flagged.items():
             self.assertEqual([hit.group(1) for hit in presubmit.SHORT_NAME.finditer(text)], [name], text)
         for text in allowed:
-            names = [hit.group(1) for hit in presubmit.SHORT_NAME.finditer(text)]
-            self.assertTrue(all(presubmit.SHORT_OK.match(name) for name in names), (text, names))
+            names = [presubmit.short_name(text, hit) for hit in presubmit.SHORT_NAME.finditer(text)]
+            self.assertTrue(not any(names), (text, names))
+
+    def test_short_names_loop_counters_only_in_a_for_init(self):
+        # .clang-tidy: IgnoredLoopCounterNames ^[ijkxy]$ and 2+ letters in a for-init;
+        # elsewhere (a plain or range-for variable) the variable rules
+        def names(text):
+            return [presubmit.short_name(text, hit) for hit in presubmit.SHORT_NAME.finditer(text)]
+        self.assertEqual(names("    int i = 0;"), ["i"])
+        self.assertEqual(names("    for (int i = 0; i < 3; ++i)"), [None])
+        self.assertEqual(names("    for (int ab = 0; ab < 3; ++ab)"), [None])
+        self.assertEqual(names("    for (auto& c : list)"), ["c"])
+
+    def test_trap_handler_must_exit_in_its_own_body(self):
+        # #101: a greedy match ran to the file's last `}`, so a later `exit` passed a handler that never exits
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "a.sh").write_text("#!/bin/sh\nstop() {\n    rm -f x\n}\ntrap stop INT\nlater() {\n    exit 1\n}\n")
+            (root / "b.sh").write_text("#!/bin/sh\nstop() { rm -f x; exit 130; }\ntrap stop INT\n")
+            presubmit.check_traps(root, ["a.sh", "b.sh"])
+        self.assertEqual([message.split(":")[0] for level, name, message in presubmit.results if name == "shell-trap"], ["a.sh"])
 
     def test_short_names_reports_added_cpp_only(self):
         presubmit.check_short_names({"a.cpp": [(3, "    auto c = 1;")], "b.py": [(1, "c = 1")]})
@@ -60,11 +79,21 @@ class PresubmitTests(unittest.TestCase):
     def test_siblings_warn_on_one_unit_kind(self):
         with tempfile.TemporaryDirectory() as directory:
             presubmit.check_review(Path(directory), "main", ["components/game/fight.cpp"],
-                                   {"components/game/fight.cpp": [(10, "    if (player.alive()) hurt(player);")],
+                                   {"components/game/fight.cpp": [(10, "    if (player.alive()) hurt(player);"),
+                                                                  (11, "    player.mode = kModeGH;")],
                                     "tests/test_game.cpp": [(5, "    assert(merc.alive());")]})
         warnings = [message for level, name, message in presubmit.results if name == "siblings"]
         self.assertTrue(any(message.startswith("unit kinds: the diff touches player,") for message in warnings), warnings)
         self.assertIn("test-gap", [name for _, name, _ in presubmit.results])
+
+    def test_siblings_quiet_outside_the_game_or_on_one_mention(self):
+        # #101: it fired on nearly every diff that says `player`
+        with tempfile.TemporaryDirectory() as directory:
+            presubmit.check_review(Path(directory), "main", ["apps/d2d/town.cpp", "components/game/fight.cpp"],
+                                   {"apps/d2d/town.cpp": [(1, "    draw(player);"), (2, "    label(player);")],
+                                    "components/game/fight.cpp": [(3, "    hurt(player);")]})
+        self.assertFalse([message for level, name, message in presubmit.results
+                          if name == "siblings" and message.startswith("unit kinds")])
 
     def test_build_jobs_at_least_one(self):
         self.assertGreaterEqual(presubmit.build_jobs(), 1)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Check a branch before the push: the build, lint and test failures CI
 hit on PRs #15-#97, and the patterns behind most of their review comments.
 
@@ -62,7 +63,7 @@ def added_lines(tree, base):
 
 def check_hygiene(tree, base, changed):
     whitespace = subprocess.run(["git", "-C", str(tree), "diff", "--check", f"{base}...HEAD"],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, check=False)
     report("FAIL" if whitespace.returncode else "ok", "whitespace",
            (whitespace.stdout.strip().splitlines() or ["git diff --check"])[0] if whitespace.returncode else
            f"{len(changed)} files")
@@ -84,10 +85,11 @@ def check_shell(tree, changed, numbers):
     scripts = [path for path in changed if is_shell(path)]
     if not scripts:
         return
+    check_traps(tree, scripts)
     if not shutil.which("shellcheck"):
         report("WARN", "shellcheck", "not installed; " + ", ".join(scripts) + " unchecked")
         return
-    run = subprocess.run(["shellcheck", "-f", "gcc", *scripts], cwd=tree, capture_output=True, text=True)
+    run = subprocess.run(["shellcheck", "-f", "gcc", *scripts], cwd=tree, capture_output=True, text=True, check=False)
     mine, elsewhere = [], 0
     for hit in re.finditer(r"^(\S+?):(\d+):\d+: (?:error|warning): (.*)$", run.stdout, re.M):
         if int(hit.group(2)) in numbers.get(hit.group(1), set()):
@@ -96,14 +98,18 @@ def check_shell(tree, changed, numbers):
             elsewhere += 1
     report("FAIL" if mine else "ok", "shellcheck", "\n      ".join(mine[:15]) if mine else
            f"{len(scripts)} scripts ({elsewhere} on lines this branch didn't add)")
-    for path in scripts:                    # sweep.sh on #91: a trap that cleans up but doesn't exit
+
+
+def check_traps(tree, scripts):
+    """sweep.sh on #91: a trap that cleans up but doesn't exit."""
+    for path in scripts:
         text = (tree / path).read_text(errors="replace")
         for line in text.splitlines():
             if not re.match(r"\s*trap\b.*\b(INT|TERM|HUP)\b", line) or "exit" in line:
                 continue
             handlers = re.findall(r"trap\s+['\"]?(\w+)", line)
             # a one-line `stop() { ...; exit "$1"; }` or a body ending at a `}` line
-            bodies = [re.search(rf"^{name}\s*\(\)\s*\{{(.*\}}\s*$|.*?^\}})", text, re.S | re.M) for name in handlers]
+            bodies = [re.search(rf"^{name}\s*\(\)\s*\{{(.*?\}}\s*$|.*?^\}})", text, re.S | re.M) for name in handlers]
             if not handlers or not all(body and "exit" in body.group(1) for body in bodies):
                 report("WARN", "shell-trap", f"{path}: `{line.strip()}` handles a signal without exiting")
 
@@ -130,7 +136,7 @@ def check_python(tree, changed, numbers):
         report("WARN", "ruff", "neither ruff nor uvx; Python unchecked")
         return
     run = subprocess.run([*ruff, "check", "--no-cache", "--output-format", "json", "--select", RUFF_RULES, *scripts],
-                         cwd=tree, capture_output=True, text=True)
+                         cwd=tree, capture_output=True, text=True, check=False)
     try:
         found = json.loads(run.stdout or "[]")
     except json.JSONDecodeError:
@@ -139,8 +145,9 @@ def check_python(tree, changed, numbers):
     mine = [hit for hit in found
             if hit["location"]["row"] in numbers.get(os.path.relpath(hit["filename"], tree), set())]
     def line(hit):
-        return f"{os.path.relpath(hit['filename'], tree)}:{hit['location']['row']}: {hit['code']} {hit['message']}"
-    hard = [line(hit) for hit in mine if hit["code"].startswith(RUFF_HARD) and not hit["code"].startswith("BLE")]
+        return f"{os.path.relpath(hit['filename'], tree)}:{hit['location']['row']}: {hit['code'] or 'syntax'} {hit['message']}"
+    # a syntax error has no code (null): py-compile above already failed it
+    hard = [line(hit) for hit in mine if (hit["code"] or "E999").startswith(RUFF_HARD) and not (hit["code"] or "").startswith("BLE")]
     soft = [line(hit) for hit in mine if line(hit) not in hard]
     report("FAIL" if hard else "ok", "ruff", "\n      ".join(hard[:15]) if hard else
            f"{len(scripts)} files ({len(found) - len(mine)} on lines this branch didn't add)")
@@ -158,7 +165,7 @@ def check_python(tree, changed, numbers):
                     for label, extra in (("", {}), (" (symlinked TMPDIR)", {"TMPDIR": str(linked)})):
                         run = subprocess.run([sys.executable, "-m", "unittest", Path(test).name], cwd=tree / Path(test).parent,
                                              capture_output=True, text=True,
-                                             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **extra})
+                                             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **extra}, check=False)
                         report("FAIL" if run.returncode else "ok", "tool-tests",
                                f"{test}{label}: " + (run.stderr.strip().splitlines() or ["no output"])[-1])
             finally:
@@ -169,15 +176,21 @@ def check_python(tree, changed, numbers):
 
 def wait_for_other_builds(limit_s=1800):
     """One build at a time: two at once on a 15 GB machine got cc1plus
-    OOM-killed. Wait while another compiler, linker or clang-tidy runs."""
+    OOM-killed. Wait while this user's compiler or clang-tidy runs (not
+    `ld`: any linker on the machine, other projects' too)."""
     import time
     waited = 0
-    while shutil.which("pgrep") and \
-            subprocess.run(["pgrep", "-x", "cc1plus|clang-tidy|ld|mold"], capture_output=True).returncode == 0:
+    while shutil.which("pgrep"):
+        running = subprocess.run(["pgrep", "-l", "-u", str(os.getuid()), "-x", "cc1plus|clang-tidy"],
+                                 capture_output=True, text=True, check=False).stdout.split("\n")
+        running = [row for row in running if row]
+        if not running:
+            return
         if waited == 0:
-            print("presubmit: another build is running; waiting for it", flush=True)
+            print(f"presubmit: another build is running ({', '.join(running[:4])}); waiting for it", flush=True)
         if waited >= limit_s:
-            sys.exit("presubmit: another build is still running; rerun when it is done")
+            sys.exit(f"presubmit: another build is still running after {limit_s // 60} min "
+                     f"({', '.join(running[:4])}); rerun when it is done")
         time.sleep(15)
         waited += 15
 
@@ -210,7 +223,7 @@ def docker_command(command):
     """The command as is, or through `sg docker` when this shell predates the
     user's docker group membership (added without a re-login)."""
     if not shutil.which("docker") or not shutil.which("sg") or \
-            subprocess.run(["docker", "info"], capture_output=True).returncode == 0:
+            subprocess.run(["docker", "info"], capture_output=True, check=False).returncode == 0:
         return command
     return ["sg", "docker", "-c", " ".join(shlex.quote(part) for part in command)]
 
@@ -219,7 +232,16 @@ def docker_command(command):
 # A fast stand-in that runs in --quick too (#93's test `at`, #92's `c`).
 SHORT_NAME = re.compile(r"(?:\b(?:auto|int|float|bool|double|std::\w+|std::size_t|unsigned|char)\b[&*\s]+|\bconst\s+\w+[&*\s]+)"
                         r"([A-Za-z_]\w?)\s*(?:=|\{|;|:(?!:))")
-SHORT_OK = re.compile(r"^(x|y|dx|dy|id|ok|[ijk])$")
+SHORT_OK = re.compile(r"^(x|y|dx|dy|id|ok)$")             # IgnoredVariableNames
+LOOP_OK = re.compile(r"^([ijkxy]|\w\w)$")                 # a for-init counter: IgnoredLoopCounterNames, or 2+ letters
+FOR_INIT = re.compile(r"\bfor\s*\(\s*$")
+
+
+def short_name(code, hit):
+    """The name if CI's tidy would flag it: a for-init counter by the loop rules, the rest as variables."""
+    name = hit.group(1)
+    counter = FOR_INIT.search(code[:hit.start()]) and not code[hit.end(1):].lstrip().startswith(":")
+    return None if (LOOP_OK if counter else SHORT_OK).match(name) else name
 
 
 def check_short_names(texts):
@@ -230,8 +252,8 @@ def check_short_names(texts):
         for line, text in rows:
             code = text.split("//", 1)[0]
             for hit in SHORT_NAME.finditer(code):
-                if not SHORT_OK.match(hit.group(1)):
-                    hits.append(f"{path}:{line}: '{hit.group(1)}' is shorter than 3 letters (readability-identifier-length)")
+                if name := short_name(code, hit):
+                    hits.append(f"{path}:{line}: '{name}' is shorter than 3 letters (readability-identifier-length)")
     report("FAIL" if hits else "ok", "short-names", "\n      ".join(hits[:15]) if hits else "no 1-2 letter names added")
 
 
@@ -244,18 +266,21 @@ def check_cpp(tree, changed, numbers, build, quick, docker):
     if docker:
         # CI's own script, with -j cut to what fits and the container capped
         # below the host's memory, so an OOM stops the build and not the host
-        env = {**os.environ, "JOBS": os.environ.get("JOBS", str(build_jobs())),
-               "D2D_DOCKER_MEMORY": os.environ.get("D2D_DOCKER_MEMORY", f"{memory_cap_gb()}g")}
-        run = subprocess.run(docker_command([str(tree / "tools/validate-linux.sh")]), cwd=tree, env=env)
+        # (macOS has no /proc/meminfo: build_jobs() is then a core count, so
+        # cap it to the container's memory at ~2 GB a job as well)
+        cap = memory_cap_gb()
+        env = {**os.environ, "JOBS": os.environ.get("JOBS", str(max(1, min(build_jobs(), cap // 2)))),
+               "D2D_DOCKER_MEMORY": os.environ.get("D2D_DOCKER_MEMORY", f"{cap}g")}
+        run = subprocess.run(docker_command([str(tree / "tools/validate-linux.sh")]), cwd=tree, env=env, check=False)
         report("FAIL" if run.returncode else "ok", "validate-linux", f"exit {run.returncode}")
         return run.returncode == 0
     build.mkdir(parents=True, exist_ok=True)
     configure = ["cmake", "-S", str(tree), "-B", str(build), "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release",
                  f"-DCMAKE_CXX_FLAGS={CI_FLAGS}", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", "-DD2D_BUILD_TESTS=ON"]
     with open(build / "presubmit-build.log", "w") as log:
-        ok = (subprocess.run(configure, stdout=log, stderr=subprocess.STDOUT).returncode == 0 and
+        ok = (subprocess.run(configure, stdout=log, stderr=subprocess.STDOUT, check=False).returncode == 0 and
               subprocess.run(["cmake", "--build", str(build), "--", "-k", "0", "-j", str(build_jobs())], stdout=log,
-                             stderr=subprocess.STDOUT).returncode == 0)
+                             stderr=subprocess.STDOUT, check=False).returncode == 0)
     if not ok:
         log_text = (build / "presubmit-build.log").read_text(errors="replace")
         if "Killed signal" in log_text:     # the OOM killer, not the code: rerun with less else building
@@ -274,12 +299,12 @@ def check_cpp(tree, changed, numbers, build, quick, docker):
     # tidy-pr-select reads changed.txt from its cwd: run it in the build dir, not the worktree
     (build / "changed.txt").write_text("".join(f"{tree / path}\n" for path in sources))
     select = subprocess.run([sys.executable, str(tree / "tools/tidy-pr-select.py")], cwd=build, capture_output=True,
-                            text=True, env={**os.environ, "BUILD_DIR": str(build)})
+                            text=True, env={**os.environ, "BUILD_DIR": str(build)}, check=False)
     units = select.stdout.split() if select.returncode == 0 and select.stdout.strip() else \
         [str(tree / path) for path in sources if path.endswith(".cpp")]
     def tidy(unit):
         return subprocess.run(["clang-tidy", "-p", str(build), "--quiet", "--extra-arg=-Wno-unknown-warning-option", unit],
-                              capture_output=True, text=True).stdout
+                              capture_output=True, text=True, check=False).stdout
     mine, elsewhere = [], 0
     with concurrent.futures.ThreadPoolExecutor(build_jobs()) as pool:   # CI: xargs -P 4; capped by memory
         outputs = list(pool.map(tidy, units))
@@ -304,7 +329,7 @@ def check_ctest(build, quick, docker, built):
         report("WARN", "ctest", "D2_MPQ_DIR isn't set: the data tests skip")
     with open(build / "presubmit-ctest.log", "w") as log:
         run = subprocess.run(["ctest", "--test-dir", str(build), "--output-on-failure", "-j4"], env=env,
-                             stdout=log, stderr=subprocess.STDOUT)
+                             stdout=log, stderr=subprocess.STDOUT, check=False)
     text = (build / "presubmit-ctest.log").read_text(errors="replace")
     summary = re.search(r"\d+% tests passed.*", text)
     failed = re.findall(r"^\s*\d+ - (\S+) \(", text, re.M)
@@ -313,7 +338,7 @@ def check_ctest(build, quick, docker, built):
         # one that passes alone is a WARN to rerun, not the branch's failure
         with open(build / "presubmit-ctest-rerun.log", "w") as log:
             rerun = subprocess.run(["ctest", "--test-dir", str(build), "--output-on-failure", "--rerun-failed"], env=env,
-                                   stdout=log, stderr=subprocess.STDOUT)
+                                   stdout=log, stderr=subprocess.STDOUT, check=False)
         if rerun.returncode == 0:
             report("WARN", "ctest", f"{', '.join(failed)} failed under -j4 and passed alone (flaky in parallel)")
             return
@@ -324,11 +349,12 @@ def check_ctest(build, quick, docker, built):
 # ---------------------------------------------------------------- review nudges (WARN)
 
 # The biggest class of review findings on PRs #15-#97 (59 of 189): a change reached one of these and not its siblings.
-SIBLINGS = [
-    ("unit kinds", {"player": r"\b(player|hero)\b", "merc": r"\b(merc|hireling)", "pet": r"\b(pet|summon|minion)",
+GAME = ("components/game/", "components/rules/")
+SIBLINGS = [   # (family, the paths it reads, members): a member counts at 2+ added lines, so a passing mention doesn't
+    ("unit kinds", GAME, {"player": r"\b(player|hero)\b", "merc": r"\b(merc|hireling)", "pet": r"\b(pet|summon|minion)",
                     "monster": r"\bmonster", "co-op partner": r"\b(other_?player|OtherPlayer|coop|co-op|partner|joined)"}),
-    ("hit paths", {"melee": r"\b(melee|strike|swing)", "missile": r"\b(missile|shot|projectile)", "skill": r"\bskill"}),
-    ("net roles", {"host": r"\bhost\b", "client": r"\b(client|join(ed|er)?)\b"}),
+    ("hit paths", GAME, {"melee": r"\b(melee|strike|swing)", "missile": r"\b(missile|shot|projectile)", "skill": r"\bskill"}),
+    ("net roles", ("apps/d2d/", "components/net/", *GAME), {"host": r"\bhost\b", "client": r"\b(client|join(ed|er)?)\b"}),
 ]
 RISKY = [   # error paths CodeRabbit kept finding (unchecked-error 12, leaks 9, python 13)
     (r"\.cpp$|\.hpp$", r"std::ofstream|fopen\(", "file write: checked and closed before use/rename?"),
@@ -345,10 +371,11 @@ STATE = re.compile(r"^\s+(?:bool|int|unsigned|float|double|std::\w+(?:<[^;]*>)?|
 
 def check_review(tree, base, changed, texts):
     code = {path: rows for path, rows in texts.items() if path.endswith((".cpp", ".hpp"))}
-    # siblings from the change itself, not its tests (#90: a test's `std::vector<Missile>` read as a missile path)
-    blob = "\n".join(text for path, rows in code.items() if not path.startswith("tests/") for _, text in rows)
-    for family, members in SIBLINGS:
-        seen = [name for name, pattern in members.items() if re.search(pattern, blob, re.I)]
+    # siblings from the change itself, not its tests (#90: a test's `std::vector<Missile>` read as a missile path),
+    # in the code where the family lives (#101: always on for any diff that says `player`)
+    for family, where, members in SIBLINGS:
+        lines = [text for path, rows in code.items() if path.startswith(where) for _, text in rows]
+        seen = [name for name, pattern in members.items() if sum(1 for text in lines if re.search(pattern, text, re.I)) >= 2]
         if 0 < len(seen) < len(members):
             missing = [name for name in members if name not in seen]
             report("WARN", "siblings", f"{family}: the diff touches {', '.join(seen)}, not {', '.join(missing)}. "
@@ -419,18 +446,22 @@ def main():
     if not (tree / ".git").exists():
         sys.exit(f"presubmit: {tree} is not a git worktree")
     def has(ref):
-        return subprocess.run(["git", "-C", str(tree), "rev-parse", "-q", "--verify", ref], capture_output=True).returncode == 0
+        return subprocess.run(["git", "-C", str(tree), "rev-parse", "-q", "--verify", ref], capture_output=True, check=False).returncode == 0
     base = args.base or next((ref for ref in ("upstream/main", "origin/main") if has(ref)), "upstream/main")
     if not has(base):
         sys.exit(f"presubmit: no {base} (git fetch upstream?)")
     args.base = base
     if args.docker and (not shutil.which("docker") or
-                        subprocess.run(docker_command(["docker", "info"]), capture_output=True).returncode):
+                        subprocess.run(docker_command(["docker", "info"]), capture_output=True, check=False).returncode):
         sys.exit("presubmit: --docker, but the docker daemon isn't reachable")
     branch = git(tree, "branch", "--show-current").strip() or "detached"
     build = Path(args.build).resolve() if args.build else tree / "build-presubmit"
     dirty = git(tree, "status", "--porcelain", "--untracked-files=no").strip()
-    print(f"presubmit: {branch} in {tree}, against {args.base}" + (" (uncommitted changes not checked)" if dirty else ""))
+    print(f"presubmit: {branch} in {tree}, against {args.base}")
+    if dirty:
+        # lint and the review checks read the commits (base...HEAD); cmake, clang-tidy and ctest the working tree
+        report("WARN", "dirty-tree", "uncommitted changes: the build and tests include them, lint and review checks don't. "
+                                     "Commit first so both see the same code.")
 
     changed = [path for path in git(tree, "diff", "--name-only", "--diff-filter=AMR", f"{args.base}...HEAD").split()]
     if not changed:
