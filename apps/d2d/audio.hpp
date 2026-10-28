@@ -108,7 +108,8 @@ struct Audio {
     std::int64_t sound_tick = 0;                 // DAT_007bc9bc: +1 each 40 ms
     std::uint64_t tick_mark_ms = 0;
     [[nodiscard]] float duck(const Channel& channel) const {
-        if (solo_percent == 100 && menu_percent == 100) return 1.f;
+        // played by path, no Sounds.txt row (the frontend's music, button.wav): not a game sound, never ducked
+        if ((solo_percent == 100 && menu_percent == 100) || channel.sound <= 0) return 1.f;
         return float(d2d::rules::ducked_volume(10000, channel.sound, channel.solo, menu_percent, solo_percent)) / 10000.f;
     }
     void apply_volume() {
@@ -330,6 +331,7 @@ struct Audio {
         for (auto& channel : sfx) stop(channel);
         for (auto* channel : { &ambience, &ambience_old, &rain }) stop(*channel);
         world_paused = false;
+        menu_paused = false;                     // left from the game menu: step_ducks fades back up
     }
     // A cinematic over the game: the world's sounds hold until it ends.
     // (Under the paused game menu they fade out instead: menu_paused.)
