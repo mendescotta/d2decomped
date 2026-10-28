@@ -10,6 +10,8 @@
 #include <optional>
 #include <span>
 
+#include <sound_mix.hpp>
+
 namespace d2d::rules {
 
 // One playing sound, as the start rules see it.
@@ -95,6 +97,12 @@ constexpr int ducked_volume(int volume, int row, bool solo_row, int menu_percent
     if (menu_percent != 100 && !menu_exempt(row)) volume = menu_percent * volume / 100;
     if (solo_percent != 100 && !solo_row) volume = solo_percent * volume / 100;
     return volume;
+}
+// A world sound's mix under the ducks, in FUN_004dfc20's order: the row's
+// 0..255 volume is ducked first (whole percent steps, each truncated), and
+// the distance and pan mix (sound_mix_pixels) works on what's left.
+inline SoundMix ducked_mix(int volume, int falloff, float screen_x, float screen_y2, int row, bool solo_row, int menu_percent, int solo_percent) {
+    return sound_mix_pixels(ducked_volume(volume, row, solo_row, menu_percent, solo_percent), falloff, screen_x, screen_y2);
 }
 
 }  // namespace d2d::rules

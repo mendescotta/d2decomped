@@ -61,7 +61,20 @@ Each sound tick `FUN_004ba020` (0x4ba68f) steps two volume percentages:
   instances keep running: under the pause the world's sounds fade out
   while the ambience and the music play on, and fade back in after.
 
-d2d: rules/sound_start.hpp has the rules and the ducks. audio.hpp keeps
+Both are applied in `FUN_004dfc20`, on the instance's 0..255 volume
+(+0x1c), in this order, each a whole percent with the product truncated
+(`* 0x51eb851f, sar 5`): Music Vol rows x music / 100 (0x4dfc84), every
+row x master / 100 (0x4dfca1), the menu (0x4dfcb2), Solo (0x4dfd0b). The
+speaker-mode step and the distance falloff (from 0x4dfeb5) then work on
+that volume. At 255 under menu 50 and Solo 70 that is 255 -> 127 -> 88,
+not 255 x 0.5 x 0.7 = 89.25.
+
+d2d: rules/sound_start.hpp has the rules and the ducks; `ducked_mix`
+ducks a world sound's volume before its distance mix, as above. Sounds
+not placed in the world (UI, voice, ambience, music) carry a float gain
+with their fades and take the ducks as a multiplier, and master / music
+are the listener's and the music channel's gains, not this chain's
+integer steps. audio.hpp keeps
 a sound tick per 40 ms and, per channel, the group's first row and the
 unit it plays on (`unit_key` in game/cues.hpp: the hero, a monster, an
 object or a missile). Compound joins the playing instance without adding

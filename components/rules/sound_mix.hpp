@@ -67,8 +67,11 @@ static_assert(speakers({ true, 255, 255 }).left == 0.f && speakers({ true, 255, 
 
 // The same `dx`, `dy` cells away (d2d's cells: 5 subtiles, a subtile 32 x 16
 // client pixels).
+struct ScreenOffset { float x, y2; };
+constexpr ScreenOffset screen_offset(float dx, float dy) { return { (dx - dy) * 80.f, (dx + dy) * 80.f }; }
 inline SoundMix sound_mix(int volume, int falloff, float dx, float dy) {
-    return sound_mix_pixels(volume, falloff, (dx - dy) * 80.f, (dx + dy) * 80.f);
+    const auto [screen_x, screen_y2] = screen_offset(dx, dy);
+    return sound_mix_pixels(volume, falloff, screen_x, screen_y2);
 }
 
 }  // namespace d2d::rules

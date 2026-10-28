@@ -67,6 +67,20 @@ int main() {
     assert(d2d::rules::ducked_volume(200, 500, false, 100, 70) == 140);
     assert(d2d::rules::ducked_volume(200, 0xb80, true, 100, 70) == 200);     // the Solo line itself
     assert(d2d::rules::ducked_volume(255, 500, false, 50, 70) == 70 * (50 * 255 / 100) / 100);
+    // A world sound's mix (FUN_004dfc20): the ducks on its 0..255 volume first, each step truncated,
+    // then distance and pan on that; not a gain multiplier after the mix (255 x .5 x .7 = 89.25).
+    using d2d::rules::ducked_mix;
+    assert(ducked_mix(255, 1, 0.f, 0.f, 500, false, 50, 70).volume == 88);
+    assert(ducked_mix(10, 1, 0.f, 0.f, 500, false, 50, 70).volume == 3);       // 10 -> 5 -> 3, not 3.5
+    assert(ducked_mix(255, 1, 0.f, 0.f, 0x40, false, 0, 70).volume == 178);    // ambience: Solo only (255 x 70 / 100)
+    assert(ducked_mix(255, 1, 0.f, 0.f, 0xb80, true, 50, 70).volume == 127);   // a Solo row: the menu only
+    assert(ducked_mix(255, 1, 0.f, 0.f, 500, false, 100, 100).volume == 255);
+    for (const float far_x : { 300.f, 650.f }) {                              // away, and near the far range
+        const auto ducked = ducked_mix(200, 1, far_x, 40.f, 500, false, 50, 70);
+        const auto plain = d2d::rules::sound_mix_pixels(70 * (50 * 200 / 100) / 100, 1, far_x, 40.f);
+        assert(ducked.audible && ducked.volume == plain.volume && ducked.pan == plain.pan);
+    }
+    assert(!ducked_mix(255, 1, 800.f, 0.f, 500, false, 50, 70).audible);       // past Falloff 1's 700 px
     std::puts("test_sound_start: ok");
     return 0;
 }

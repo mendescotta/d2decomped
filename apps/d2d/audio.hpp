@@ -68,7 +68,7 @@ struct Audio {
         bool placed = false, tracking = false;
         float x = 0.f, y = 0.f;
         int volume = 255, falloff = 0;
-        d2d::rules::SoundMix mix;                // a placed one's mix before the ducks
+        float screen_x = 0.f, screen_y2 = 0.f;   // a placed one from the listener at its last mix, client pixels (rules::screen_offset)
         // How it started (rules/sound_start.hpp): its group's first row, the
         // unit it plays on, the sound tick it started, Solo.
         int group_base = 0;
@@ -107,6 +107,9 @@ struct Audio {
     bool menu_paused = false;                    // a local game paused under the game menu (Town)
     std::int64_t sound_tick = 0;                 // DAT_007bc9bc: +1 each 40 ms
     std::uint64_t tick_mark_ms = 0;
+    // A placed sound takes them in its integer volume (apply_mix, rules::ducked_mix).
+    // ponytail: one not placed (UI, voice, ambience, music) has a float gain
+    // with its fades and takes them as a multiplier, not truncated percent steps.
     [[nodiscard]] float duck(const Channel& channel) const {
         // played by path, no Sounds.txt row (the frontend's music, button.wav): not a game sound, never ducked
         if ((solo_percent == 100 && menu_percent == 100) || channel.sound <= 0) return 1.f;
@@ -237,9 +240,10 @@ struct Audio {
                     std::uint64_t unit = 0) {
         const auto* snd = variant_row(game_data, index, variant);
         if (!snd) return;
-        const auto mix = d2d::rules::sound_mix(std::clamp(snd->volume, 0, 255), snd->falloff, x - listener_x, y - listener_y);
+        const auto [screen_x, screen_y2] = d2d::rules::screen_offset(x - listener_x, y - listener_y);
+        const auto mix = d2d::rules::sound_mix_pixels(std::clamp(snd->volume, 0, 255), snd->falloff, screen_x, screen_y2);
         if (!ok || !mix.audible || mix.volume <= 0 || !may_start(game_data, index, unit, true)) return;
-        if (Channel* channel = play_mixed(game_data, *snd, int(snd - game_data.sounds.data()), mix)) {
+        if (Channel* channel = play_mixed(game_data, *snd, int(snd - game_data.sounds.data()), screen_x, screen_y2)) {
             started(*channel, game_data, index, unit);
             channel->owner = owner;
             channel->tracking = snd->tracking;
@@ -253,8 +257,7 @@ struct Audio {
         const auto* snd = variant_row(game_data, index, variant);
         if (!snd) return;
         if (!may_start(game_data, index, 0, true)) return;
-        if (Channel* channel = play_mixed(game_data, *snd, int(snd - game_data.sounds.data()),
-                                          d2d::rules::sound_mix_pixels(std::clamp(snd->volume, 0, 255), snd->falloff, screen_x, screen_y2)))
+        if (Channel* channel = play_mixed(game_data, *snd, int(snd - game_data.sounds.data()), screen_x, screen_y2))
             started(*channel, game_data, index, 0);
     }
     // A free world channel, else the oldest reused.
@@ -299,20 +302,28 @@ struct Audio {
     // straight to its speaker, so game.exe's pan law holds (Speakers).
     bool direct_channels = false;
     static constexpr ALenum kDirectChannelsSoft = 0x1033;   // AL_DIRECT_CHANNELS_SOFT (alext.h)
-    void apply_mix(Channel& channel, const d2d::rules::SoundMix& mix) {
-        channel.mix = mix;
-        const float ducked = duck(channel);
+    // A placed sound's mix `screen_x`, `screen_y2` from the listener, under the
+    // ducks as FUN_004dfc20 has them (rules::ducked_mix); false past its far range.
+    bool apply_mix(Channel& channel, float screen_x, float screen_y2) {
+        channel.screen_x = screen_x;
+        channel.screen_y2 = screen_y2;
+        // played by path, no Sounds.txt row: never ducked (as `duck`)
+        const auto mix = channel.sound > 0
+            ? d2d::rules::ducked_mix(channel.volume, channel.falloff, screen_x, screen_y2, channel.sound, channel.solo, menu_percent, solo_percent)
+            : d2d::rules::sound_mix_pixels(channel.volume, channel.falloff, screen_x, screen_y2);
+        if (!mix.audible) return false;
         if (channel.right_src) {
             const auto speakers = d2d::rules::speakers(mix);
-            alSourcef(channel.src, AL_GAIN, speakers.left * ducked);
-            alSourcef(channel.right_src, AL_GAIN, speakers.right * ducked);
-            return;
+            alSourcef(channel.src, AL_GAIN, speakers.left);
+            alSourcef(channel.right_src, AL_GAIN, speakers.right);
+            return true;
         }
         // ponytail: without direct channels OpenAL pans the mono source by
         // its angle, not game.exe's far-side-down law.
         const float pan = std::clamp(float(mix.pan - 128) / 128.f, -1.f, 1.f);
-        alSourcef(channel.src, AL_GAIN, float(mix.volume) / 255.f * ducked);
+        alSourcef(channel.src, AL_GAIN, float(mix.volume) / 255.f);
         alSource3f(channel.src, AL_POSITION, pan, 0.f, -std::sqrt(std::max(0.f, 1.f - pan * pan)));
+        return true;
     }
     // Every frame: Tracking sounds follow their owner (`where(owner)`, a
     // position or nothing) and the listener, and stop past their far range
@@ -321,9 +332,8 @@ struct Audio {
         for (auto& channel : sfx) {
             if (!channel.src || !channel.placed || !channel.tracking) continue;
             if (const auto position = where(channel.owner)) { channel.x = position->first; channel.y = position->second; }
-            const auto mix = d2d::rules::sound_mix(channel.volume, channel.falloff, channel.x - listener_x, channel.y - listener_y);
-            if (mix.audible) apply_mix(channel, mix);
-            else stop(channel);
+            const auto [screen_x, screen_y2] = d2d::rules::screen_offset(channel.x - listener_x, channel.y - listener_y);
+            if (!apply_mix(channel, screen_x, screen_y2)) stop(channel);
         }
     }
     // Leaving the game: every world sound, the level's ambience and the rain.
@@ -397,8 +407,9 @@ struct Audio {
         const int row = group > 1 ? index + variant % group : index;
         return std::size_t(row) < game_data.sounds.size() ? &game_data.sounds[std::size_t(row)] : nullptr;
     }
-    // A free world channel (else the oldest), the sound started in it at `mix`.
-    Channel* play_mixed(const GameData& game_data, const GameData::Sound& snd, int index, const d2d::rules::SoundMix& mix) {
+    // A free world channel (else the oldest), the sound started in it `screen_x`, `screen_y2` from the listener.
+    Channel* play_mixed(const GameData& game_data, const GameData::Sound& snd, int index, float screen_x, float screen_y2) {
+        const auto mix = d2d::rules::sound_mix_pixels(std::clamp(snd.volume, 0, 255), snd.falloff, screen_x, screen_y2);
         if (!ok || !mix.audible || mix.volume <= 0 || unplayable.contains(index)) return nullptr;
         auto& channel = free_channel();
         stop(channel);
@@ -420,7 +431,7 @@ struct Audio {
         channel.solo = snd.solo;
         channel.volume = std::clamp(snd.volume, 0, 255);
         channel.falloff = snd.falloff;
-        apply_mix(channel, mix);
+        apply_mix(channel, screen_x, screen_y2);
         if (world_paused) {
             alSourcePause(channel.src);
             if (channel.right_src) alSourcePause(channel.right_src);
@@ -627,7 +638,7 @@ struct Audio {
         if (solo_percent == was_solo && menu_percent == was_menu) return;
         for (auto& channel : sfx) {
             if (!channel.src) continue;
-            if (channel.placed) apply_mix(channel, channel.mix);
+            if (channel.placed) (void)apply_mix(channel, channel.screen_x, channel.screen_y2);
             else set_gain(channel, channel.gain);
         }
         for (auto* channel : { &voice, &ui_sounds, &ambience, &ambience_old, &rain, &music, &music_old }) set_gain(*channel, channel->gain);
