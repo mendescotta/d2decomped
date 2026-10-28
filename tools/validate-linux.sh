@@ -13,8 +13,11 @@ docker image inspect "$tag" >/dev/null 2>&1 || docker build -t "$tag" -f tools/v
 # JOBS: parallel compiles (default 8); D2D_DOCKER_MEMORY: a container memory
 # limit such as 10g. A C++ job at -O3 takes up to ~2 GB, so on a small machine
 # an unlimited -j 8 can run the host out of memory; with a limit, the OOM
-# killer stops the container instead.
+# killer stops the container instead. D2D_BUILD_VOLUME: the build's docker
+# volume (default d2d-build-linux); give each worktree its own, since all of
+# them mount at /src and ninja would take another tree's newer objects.
 jobs=${JOBS:-8}
+volume=${D2D_BUILD_VOLUME:-d2d-build-linux}
 limits=()
 [[ -n "${D2D_DOCKER_MEMORY:-}" ]] && limits+=(--memory="$D2D_DOCKER_MEMORY")
 # --asan: a Debug build with AddressSanitizer + UBSan on glibc (where the
@@ -29,7 +32,7 @@ if [[ "${1:-}" == "--asan" ]]; then
     done
     exec docker run --rm -t ${limits[@]+"${limits[@]}"} -e JOBS="$jobs" "${mounts[@]}" "${envs[@]}" \
         -e ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
-        -v "$PWD:/src" -v d2d-build-linux-asan:/src/build-linux-asan -w /src \
+        -v "$PWD:/src" -v "$volume-asan:/src/build-linux-asan" -w /src \
         "$tag" bash -euxc '
 cmake -S . -B build-linux-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DD2D_BUILD_TOOLS=OFF -DD2D_CHECK_HEADERS=OFF \
     -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
@@ -40,7 +43,7 @@ fi
 # build-linux/ is a docker volume, not the bind mount: Docker Desktop's
 # macOS mount throws bus errors and torn files at FFmpeg's make.
 docker run --rm -t ${limits[@]+"${limits[@]}"} -e JOBS="$jobs" \
-    -v "$PWD:/src" -v d2d-build-linux:/src/build-linux -w /src \
+    -v "$PWD:/src" -v "$volume:/src/build-linux" -w /src \
     "$tag" bash -euxc '
 # Extra warnings as proxies for MSVC checks that only fire on the Windows
 # leg: -Wshadow (C4458 hides class member), -Wconversion for the narrowing

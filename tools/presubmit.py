@@ -270,7 +270,11 @@ def check_cpp(tree, changed, numbers, build, quick, docker):
         # cap it to the container's memory at ~2 GB a job as well)
         cap = memory_cap_gb()
         env = {**os.environ, "JOBS": os.environ.get("JOBS", str(max(1, min(build_jobs(), cap // 2)))),
-               "D2D_DOCKER_MEMORY": os.environ.get("D2D_DOCKER_MEMORY", f"{cap}g")}
+               "D2D_DOCKER_MEMORY": os.environ.get("D2D_DOCKER_MEMORY", f"{cap}g"),
+               # a build volume per worktree: they all mount at /src, so with one shared volume
+               # ninja takes another branch's newer objects as up to date (a link then misses
+               # a function the branch added)
+               "D2D_BUILD_VOLUME": os.environ.get("D2D_BUILD_VOLUME", "d2d-build-linux-" + re.sub(r"[^a-z0-9_.-]+", "-", tree.name.lower()))}
         run = subprocess.run(docker_command([str(tree / "tools/validate-linux.sh")]), cwd=tree, env=env, check=False)
         report("FAIL" if run.returncode else "ok", "validate-linux", f"exit {run.returncode}")
         return run.returncode == 0
