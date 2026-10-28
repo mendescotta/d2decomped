@@ -39,6 +39,7 @@ struct Loot {
     Cues& cues;
     Character* character = nullptr;        // the acting player's (World::act_as)
     UnitState* player = nullptr;
+    std::uint64_t sound_unit = 0;          // the acting player's, for its own lines (cues.hpp unit_key)
     // The picker's party alive on the level besides them (World's): they
     // share the gold picked up.
     std::function<std::vector<Character*>()> gold_sharers;
@@ -229,7 +230,7 @@ struct Loot {
                 static constexpr std::array<const char*, 7> kCantCarry{ "amazon_cantcarry_1", "sorceress_cantcarry_1", "necromancer_cantcarry_1",
                     "paladin_cantcarry_1", "barbarian_cantcarry_1", "druid_cantcarry_1", "assassin_cant_carry" };
                 d2d::log::info("no room for {}", ground_item.label);
-                cues.cue(kCantCarry[std::size_t(std::clamp(character->character_class, 0, 6))], 0, player->x, player->y);
+                cues.cue_on(sound_unit, kCantCarry[std::size_t(std::clamp(character->character_class, 0, 6))], 0, player->x, player->y);
             }
             if (taken != d2d::rules::Pickup::kGone) return;
             cues.cue("item_pickup", 0, player->x, player->y);

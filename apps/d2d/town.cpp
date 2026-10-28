@@ -1325,7 +1325,10 @@ auto Town::update(std::vector<std::uint8_t>& framebuffer, const Mouse& frame_mou
                 else open_game_menu();
             }
         }
-        if (audio_say >= 0) { audio.play_sfx(*scene, audio_say, 1.f, int(rng.next() & 1)); audio_say = -1; }
+        if (audio_say >= 0) {                              // on the hero: one line at a time
+            audio.play_sfx(*scene, audio_say, 1.f, int(rng.next() & 1), 0.f, 0, d2d::game::unit_key(d2d::game::kSoundOnPlayer, hero.id));
+            audio_say = -1;
+        }
         if (net_game)                                      // the other players' Says
             for (const auto& said : std::exchange(net_game->phrases, {})) audio.play_sfx(*scene, say_sound(said.cls, said.phrase), 1.f, int(rng.next() & 1));
         // Run's key let go (0x4691c0): back to walking, unless the toggle runs.
@@ -1879,7 +1882,8 @@ auto Town::update(std::vector<std::uint8_t>& framebuffer, const Mouse& frame_mou
             if (const auto object = std::size_t(-1 - owner); owner < 0 && object < view.npc_states.size()) return std::pair{ view.npc_states[object].x, view.npc_states[object].y };
             return std::nullopt;
         });
-        audio.pause_world(pause_sounds && !net_game && (game_menu.open || controls.open));
+        audio.pause_world(false);                  // a cinematic's hold ends
+        audio.menu_paused = !net_game && (game_menu.open || controls.open);   // the world's sounds fade out (Audio::step_ducks)
         draw(framebuffer, mouse, frame_ms);
         // Screen Shot (FUN_004fa7a0): at most one a second, Screenshot%03d,
         // the first number free. d2d writes PNG in its screenshots folder
@@ -2118,19 +2122,20 @@ auto Town::object_sounds(const Audio& audio, std::uint32_t frame_ms, float sight
             auto& was = object_modes[i];
             if (npc.root != "objects" || state.hidden || std::abs(state.x - sight_x) >= 14 || std::abs(state.y - sight_y) >= 14) { was = {}; continue; }
             const std::string_view mode = state.mode.empty() ? std::string_view("NU") : std::string_view(state.mode);
+            const auto object_unit = d2d::game::unit_key(d2d::game::kSoundOnObject, int(i));
             if (!was.empty() && was != mode)
-                cues.cue(d2d::rules::object_sound(npc.object_id, d2d::game::mode_index(mode), d2d::game::mode_index(was)), frame_ms, state.x, state.y);
+                cues.cue_on(object_unit, d2d::rules::object_sound(npc.object_id, d2d::game::mode_index(mode), d2d::game::mode_index(was)), frame_ms, state.x, state.y);
             was = mode;
             const auto subtile = [](float value) { return int(std::floor(value * 5)); };
             const int range = d2d::rules::unit_range(subtile(state.x) - subtile(sight_x), subtile(state.y) - subtile(sight_y), npc.size_x, 2);
             if (const int call = d2d::rules::object_call(npc.object_id, d2d::game::mode_index(mode), range, object_called[i] != 0); call > 0) {
-                cues.cue(call, frame_ms, state.x, state.y);
+                cues.cue_on(object_unit, call, frame_ms, state.x, state.y);
                 object_called[i] = 1;
             }
             if (const int loop = d2d::rules::object_loop(npc.object_id, d2d::game::mode_index(mode)); loop > 0) {
                 const int owner = -1 - int(i);
                 object_loops.push_back(owner);
-                if (!audio.owner_playing(owner) && !std::ranges::contains(cues.due, owner, &d2d::game::Cues::Cue::owner)) cues.cue(loop, frame_ms, state.x, state.y, owner);
+                if (!audio.owner_playing(owner) && !std::ranges::contains(cues.due, owner, &d2d::game::Cues::Cue::owner)) cues.cue_on(object_unit, loop, frame_ms, state.x, state.y, owner);
             }
         }
     }

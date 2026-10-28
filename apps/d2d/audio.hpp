@@ -9,6 +9,7 @@
 #include <log.hpp>
 #include <rules.hpp>
 #include <sound_mix.hpp>
+#include <sound_start.hpp>
 
 #include <algorithm>
 #include <array>
@@ -67,6 +68,13 @@ struct Audio {
         bool placed = false, tracking = false;
         float x = 0.f, y = 0.f;
         int volume = 255, falloff = 0;
+        d2d::rules::SoundMix mix;                // a placed one's mix before the ducks
+        // How it started (rules/sound_start.hpp): its group's first row, the
+        // unit it plays on, the sound tick it started, Solo.
+        int group_base = 0;
+        std::uint64_t unit = 0;
+        std::int64_t start_tick = 0;
+        bool solo = false;
     };
     static constexpr std::uint64_t kTickMs = 40;   // a sound tick (FUN_00482c20, 25 Hz)
     bool ok = false;
@@ -88,7 +96,20 @@ struct Audio {
     // ponytail: master is the listener's gain, so it scales cinematics too.
     int master_volume = 100, music_volume = 50;
     [[nodiscard]] float out_gain(const Channel& channel, float gain) const {
-        return &channel == &music || &channel == &music_old ? gain * float(music_volume) / 100.f : gain;
+        return (&channel == &music || &channel == &music_old ? gain * float(music_volume) / 100.f : gain) * duck(channel);
+    }
+    // The ducks (FUN_004ba020, 0x4dfcb2 / 0x4dfd0b): under a Solo row the
+    // rest at down to 70%, under the paused game menu all but the cursor,
+    // ambience and music rows down to 0, stepped each sound tick.
+    // ponytail: game.exe's paused frame runs the sound tick unpaced, so its
+    // fade is quicker than these 40 ms ticks.
+    int solo_percent = 100, menu_percent = 100;
+    bool menu_paused = false;                    // a local game paused under the game menu (Town)
+    std::int64_t sound_tick = 0;                 // DAT_007bc9bc: +1 each 40 ms
+    std::uint64_t tick_mark_ms = 0;
+    [[nodiscard]] float duck(const Channel& channel) const {
+        if (solo_percent == 100 && menu_percent == 100) return 1.f;
+        return float(d2d::rules::ducked_volume(10000, channel.sound, channel.solo, menu_percent, solo_percent)) / 10000.f;
     }
     void apply_volume() {
         if (!ok) return;
@@ -197,29 +218,28 @@ struct Audio {
     // A sound not placed in the world (the UI's, the level's ambient events)
     // at `gain`, a random one of its group, `pan` -1 (left) .. 1 (right).
     // World sounds go through play_world.
-    void play_sfx(const GameData& game_data, int index, float gain, int variant, float pan = 0.f, int owner = 0) {
+    void play_sfx(const GameData& game_data, int index, float gain, int variant, float pan = 0.f, int owner = 0, std::uint64_t unit = 0) {
         if (!ok || index <= 0 || std::size_t(index) >= game_data.sounds.size() || gain <= 0.01f) return;
+        if (!may_start(game_data, index, unit, false)) return;
         const int group = game_data.sounds[std::size_t(index)].group;
-        const auto done = [](const Channel& channel) {
-            ALint state = AL_STOPPED;
-            if (channel.src) alGetSourcei(channel.src, AL_SOURCE_STATE, &state);
-            return state != AL_PLAYING && state != AL_PAUSED;
-        };
-        const auto free_channel = std::ranges::find_if(sfx, done);
-        auto& channel = free_channel != sfx.end() ? *free_channel : sfx[sfx_next++ % sfx.size()];
+        auto& channel = free_channel();
         play(channel, game_data, group > 1 ? index + variant % group : index);
         channel.owner = owner;
-        if (channel.src) alSourcef(channel.src, AL_GAIN, channel.gain * gain);
+        started(channel, game_data, index, unit);
+        if (channel.src) set_gain(channel, channel.gain * gain);
         if (channel.src && pan != 0.f) alSource3f(channel.src, AL_POSITION, pan, 0.f, -std::sqrt(std::max(0.f, 1.f - pan * pan)));
     }
     // A world sound `x`, `y` cells away from the listener at `listener_x`,
     // `listener_y`: game.exe's distance volume and pan (rules/sound_mix.hpp);
     // not started past its Falloff's far range.
-    void play_world(const GameData& game_data, int index, int variant, float x, float y, float listener_x, float listener_y, int owner = 0) {
+    void play_world(const GameData& game_data, int index, int variant, float x, float y, float listener_x, float listener_y, int owner = 0,
+                    std::uint64_t unit = 0) {
         const auto* snd = variant_row(game_data, index, variant);
         if (!snd) return;
         const auto mix = d2d::rules::sound_mix(std::clamp(snd->volume, 0, 255), snd->falloff, x - listener_x, y - listener_y);
+        if (!ok || !mix.audible || mix.volume <= 0 || !may_start(game_data, index, unit, true)) return;
         if (Channel* channel = play_mixed(game_data, *snd, int(snd - game_data.sounds.data()), mix)) {
+            started(*channel, game_data, index, unit);
             channel->owner = owner;
             channel->tracking = snd->tracking;
             channel->x = x;
@@ -231,24 +251,66 @@ struct Audio {
     void play_placed(const GameData& game_data, int index, int variant, float screen_x, float screen_y2) {
         const auto* snd = variant_row(game_data, index, variant);
         if (!snd) return;
-        play_mixed(game_data, *snd, int(snd - game_data.sounds.data()),
-                   d2d::rules::sound_mix_pixels(std::clamp(snd->volume, 0, 255), snd->falloff, screen_x, screen_y2));
+        if (!may_start(game_data, index, 0, true)) return;
+        if (Channel* channel = play_mixed(game_data, *snd, int(snd - game_data.sounds.data()),
+                                          d2d::rules::sound_mix_pixels(std::clamp(snd->volume, 0, 255), snd->falloff, screen_x, screen_y2)))
+            started(*channel, game_data, index, 0);
+    }
+    // A free world channel, else the oldest reused.
+    Channel& free_channel() {
+        const auto done = [](const Channel& channel) {
+            ALint state = AL_STOPPED;
+            if (channel.src) alGetSourcei(channel.src, AL_SOURCE_STATE, &state);
+            return state != AL_PLAYING && state != AL_PAUSED;
+        };
+        const auto found = std::ranges::find_if(sfx, done);
+        return found != sfx.end() ? *found : sfx[sfx_next++ % sfx.size()];
+    }
+    // Whether `index` starts against the world sounds playing (rules/sound_start.hpp):
+    // Compound merges it into one of its group (nothing new starts; ponytail: the
+    // new unit isn't added to that one's list), Defer / Stop Inst and a unit's
+    // speech drop it or stop the one it clashes with. game.exe checks Compound
+    // at the play and the rest at the start; a cue plays when due, so both here.
+    bool may_start(const GameData& game_data, int index, std::uint64_t unit, bool positioned) {
+        const auto& snd = game_data.sounds[std::size_t(index)];
+        std::vector<d2d::rules::SoundInstance> playing;
+        std::vector<Channel*> of;
+        for (auto& channel : sfx) {
+            if (!channel.src || channel.sound <= 0) continue;
+            ALint state = AL_STOPPED;
+            alGetSourcei(channel.src, AL_SOURCE_STATE, &state);
+            if (state != AL_PLAYING && state != AL_PAUSED) continue;
+            playing.push_back({ channel.sound, channel.group_base, channel.unit, channel.start_tick, false });
+            of.push_back(&channel);
+        }
+        const d2d::rules::SoundRule rule{ index, snd.group_base, snd.compound, snd.defer, snd.stop_inst };
+        if (d2d::rules::compound_into(playing, rule, sound_tick)) return false;
+        const auto clash = d2d::rules::start_clash(playing, rule, unit, positioned);
+        if (clash.other && clash.stop_other) stop(*of[*clash.other]);
+        return clash.play;
+    }
+    void started(Channel& channel, const GameData& game_data, int index, std::uint64_t unit) {
+        channel.group_base = game_data.sounds[std::size_t(index)].group_base;
+        channel.unit = unit;
+        channel.start_tick = sound_tick;
     }
     // AL_SOFT_direct_channels: a split world sound's two buffers go each
     // straight to its speaker, so game.exe's pan law holds (Speakers).
     bool direct_channels = false;
     static constexpr ALenum kDirectChannelsSoft = 0x1033;   // AL_DIRECT_CHANNELS_SOFT (alext.h)
     void apply_mix(Channel& channel, const d2d::rules::SoundMix& mix) {
+        channel.mix = mix;
+        const float ducked = duck(channel);
         if (channel.right_src) {
             const auto speakers = d2d::rules::speakers(mix);
-            alSourcef(channel.src, AL_GAIN, speakers.left);
-            alSourcef(channel.right_src, AL_GAIN, speakers.right);
+            alSourcef(channel.src, AL_GAIN, speakers.left * ducked);
+            alSourcef(channel.right_src, AL_GAIN, speakers.right * ducked);
             return;
         }
         // ponytail: without direct channels OpenAL pans the mono source by
         // its angle, not game.exe's far-side-down law.
         const float pan = std::clamp(float(mix.pan - 128) / 128.f, -1.f, 1.f);
-        alSourcef(channel.src, AL_GAIN, float(mix.volume) / 255.f);
+        alSourcef(channel.src, AL_GAIN, float(mix.volume) / 255.f * ducked);
         alSource3f(channel.src, AL_POSITION, pan, 0.f, -std::sqrt(std::max(0.f, 1.f - pan * pan)));
     }
     // Every frame: Tracking sounds follow their owner (`where(owner)`, a
@@ -269,8 +331,8 @@ struct Audio {
         for (auto* channel : { &ambience, &ambience_old, &rain }) stop(*channel);
         world_paused = false;
     }
-    // The "pause_sounds" toggle: the world's sounds hold while a local game
-    // is paused (game.exe plays them on: FUN_0044efa0 still runs FUN_00482c20).
+    // A cinematic over the game: the world's sounds hold until it ends.
+    // (Under the paused game menu they fade out instead: menu_paused.)
     bool world_paused = false;
     void pause_world(bool paused) {
         if (paused == world_paused || !ok) return;
@@ -321,8 +383,10 @@ struct Audio {
         stop(channel);
         if (!ok || index <= 0 || std::size_t(index) >= game_data.sounds.size()) return;
         const auto& snd = game_data.sounds[std::size_t(index)];
-        if (const auto wav = read_wav(game_data, snd, index))
-            start(channel, *wav, float(std::clamp(snd.volume, 0, 255)) / 255.f, snd.loop, index);
+        if (const auto wav = read_wav(game_data, snd, index); wav && start(channel, *wav, float(std::clamp(snd.volume, 0, 255)) / 255.f, snd.loop, index)) {
+            channel.solo = snd.solo;
+            set_gain(channel, channel.gain);
+        }
     }
     // `index`'s row, or a random one of its group.
     static const GameData::Sound* variant_row(const GameData& game_data, int index, int variant) {
@@ -334,13 +398,7 @@ struct Audio {
     // A free world channel (else the oldest), the sound started in it at `mix`.
     Channel* play_mixed(const GameData& game_data, const GameData::Sound& snd, int index, const d2d::rules::SoundMix& mix) {
         if (!ok || !mix.audible || mix.volume <= 0 || unplayable.contains(index)) return nullptr;
-        const auto done = [](const Channel& channel) {
-            ALint state = AL_STOPPED;
-            if (channel.src) alGetSourcei(channel.src, AL_SOURCE_STATE, &state);
-            return state != AL_PLAYING && state != AL_PAUSED;
-        };
-        const auto free_channel = std::ranges::find_if(sfx, done);
-        auto& channel = free_channel != sfx.end() ? *free_channel : sfx[sfx_next++ % sfx.size()];
+        auto& channel = free_channel();
         stop(channel);
         const auto wav = read_wav(game_data, snd, index);
         if (!wav) return nullptr;
@@ -357,6 +415,7 @@ struct Audio {
         }
         if (!channel.src) return nullptr;
         channel.placed = true;
+        channel.solo = snd.solo;
         channel.volume = std::clamp(snd.volume, 0, 255);
         channel.falloff = snd.falloff;
         apply_mix(channel, mix);
@@ -541,8 +600,39 @@ struct Audio {
         vall.clear(); vfree.clear();
     }
 
+    // Each sound tick passed: the ducks step (FUN_004ba020, 0x4ba68f); on a
+    // change every channel's gain is redone.
+    void step_ducks() {
+        const auto now_ms = SDL_GetTicks();
+        if (tick_mark_ms == 0) tick_mark_ms = now_ms;
+        const auto ticks = std::min<std::uint64_t>((now_ms - tick_mark_ms) / kTickMs, 100);
+        if (ticks == 0) return;
+        tick_mark_ms += ticks * kTickMs;
+        sound_tick += std::int64_t(ticks);
+        const auto playing = [](const Channel& channel) {
+            ALint state = AL_STOPPED;
+            if (channel.src) alGetSourcei(channel.src, AL_SOURCE_STATE, &state);
+            return state == AL_PLAYING;
+        };
+        // a Solo row playing and not fading out (game.exe's instance +0x45 / +0x4d)
+        bool solo_playing = std::ranges::any_of(sfx, [&](const Channel& channel) { return channel.solo && playing(channel); });
+        for (const auto* channel : { &voice, &ui_sounds }) solo_playing = solo_playing || (channel->solo && playing(*channel));
+        const int was_solo = solo_percent, was_menu = menu_percent;
+        for (std::uint64_t k = 0; k < ticks; ++k) {
+            solo_percent = d2d::rules::solo_duck_step(solo_percent, solo_playing);
+            menu_percent = d2d::rules::menu_duck_step(menu_percent, menu_paused);
+        }
+        if (solo_percent == was_solo && menu_percent == was_menu) return;
+        for (auto& channel : sfx) {
+            if (!channel.src) continue;
+            if (channel.placed) apply_mix(channel, channel.mix);
+            else set_gain(channel, channel.gain);
+        }
+        for (auto* channel : { &voice, &ui_sounds, &ambience, &ambience_old, &rain, &music, &music_old }) set_gain(*channel, channel->gain);
+    }
     // Land a finished music job; free one-shots that have played out.
     void update() {
+        step_ducks();
         std::erase_if(music_dropped, [](const auto& dropped) { return dropped.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
         if (music_job.valid() && music_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             auto decoded = music_job.get();
@@ -588,7 +678,7 @@ struct Audio {
 inline void play_cues(Cues& cues, Audio& audio, float listener_x, float listener_y, d2d::rules::Rng& rng, std::uint32_t now_ms) {
     std::erase_if(cues.due, [&](const Cues::Cue& cue) {
         if (now_ms < cue.when_ms) return false;
-        audio.play_world(*cues.game_data, cue.sound, rng(16), cue.x, cue.y, listener_x, listener_y, cue.owner);
+        audio.play_world(*cues.game_data, cue.sound, rng(16), cue.x, cue.y, listener_x, listener_y, cue.owner, cue.unit);
         return true;
     });
 }

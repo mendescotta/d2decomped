@@ -28,7 +28,7 @@ Or use [the launcher](../launcher/README.md), which finds them for you.
 | Upscale filter (default `pixelart`; also in the launcher) | `--toggle scalemode=nearest` (or `linear`) |
 | Straight into a new character | `--start-screen charcreate --start-class 1 --start-name Test` (class 0..6: Amazon, Sorceress, Necromancer, Paladin, Barbarian, Druid, Assassin) |
 | Don't touch your saves | `--no-save` |
-| Turn a d2d extra off | `--toggle autoloot=off,trans_roof=off,autoparty=off,pause_sounds=off` |
+| Turn a d2d extra off | `--toggle autoloot=off,trans_roof=off,autoparty=off` |
 | More log detail | `--log-level debug` |
 | Drive it from a script, no window | `--headless --devctl /tmp/d2d.sock` (verbs: [docs/control_channel.md](../../docs/control_channel.md)) |
 | Every switch | `d2d --help` |

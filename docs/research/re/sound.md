@@ -61,6 +61,12 @@ Each sound tick `FUN_004ba020` (0x4ba68f) steps two volume percentages:
   instances keep running: under the pause the world's sounds fade out
   while the ambience and the music play on, and fade back in after.
 
+d2d: rules/sound_start.hpp has the rules and the ducks. audio.hpp keeps
+a sound tick per 40 ms and, per channel, the group's first row and the
+unit it plays on (`unit_key` in game/cues.hpp: the hero, a monster, an
+object or a missile). Compound joins the playing instance without adding
+the unit to a list.
+
 ## Level music and ambience
 
 Levels.txt `SoundEnv` → SoundEnviron.txt row (`Index`):

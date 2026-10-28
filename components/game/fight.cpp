@@ -297,7 +297,7 @@ auto Fight::monster_sounds(Monster& monster, std::uint32_t now_ms) -> void {
         const auto found = monster.type < 0 ? game_data->mon_sounds.end()
                          : game_data->mon_sounds.find(d2d::rules::boss_sound(game_data->monsters.types[std::size_t(monster.type)], monster.boss, superunique));
         const GameData::MonSound* sounds = found == game_data->mon_sounds.end() ? nullptr : &found->second;
-        const auto play = [&](int sound, std::uint32_t when) { cues.cue(sound, when, monster.unit.x, monster.unit.y); };
+        const auto play = [&](int sound, std::uint32_t when) { cues.cue_on(unit_key(kSoundOnMonster, monster.id), sound, when, monster.unit.x, monster.unit.y); };
         const bool town = d2d::rules::level_ids::is_town(level->id);
         if (monster.flee_sound) {
             if (sounds) play(sounds->flee, now_ms);
@@ -326,8 +326,8 @@ auto Fight::monster_sounds(Monster& monster, std::uint32_t now_ms) -> void {
             if ((monster.mode == "GH" || monster.mode == "KB" || monster.mode == "DT") && monster.hit_class
                 && !(monster.type >= 0 && game_data->monsters.types[std::size_t(monster.type)].critter)) {
                 const auto impact = d2d::rules::sound_ids::impact(monster.hit_class, monster.mode == "DT");
-                cues.cue(impact.impact, now_ms, monster.unit.x, monster.unit.y);
-                cues.cue(impact.element, now_ms, monster.unit.x, monster.unit.y);
+                cues.cue_on(unit_key(kSoundOnMonster, monster.id), impact.impact, now_ms, monster.unit.x, monster.unit.y);
+                cues.cue_on(unit_key(kSoundOnMonster, monster.id), impact.element, now_ms, monster.unit.x, monster.unit.y);
                 monster.hit_class = 0;
             }
             // Its skill's start (FUN_004c6140): cltstfunc 46 (FUN_004f0160, Baal
@@ -421,7 +421,7 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             if (skill_sequence().empty() && (mode == kModeA1 || mode == kModeA2 || (mode == kModeS3 && cls == d2d::d2s::kBarbarian) || (mode == kModeS4 && cls == d2d::d2s::kAssassin))) {
                 const auto swing = d2d::rules::sound_ids::kSwing[std::size_t(actor->player_combat.hit_class & 0xf)];
                 const int speed = d2d::rules::attack_speed(int(anim.speed ? anim.speed : 256), actor->player_combat.ias, actor->player_combat.wsm, chill_rate(now_ms));
-                cues.cue(swing.sound, now_ms + std::uint32_t((swing.frames * 256 + 128) / speed) * 40, actor->player.x, actor->player.y);
+                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), swing.sound, now_ms + std::uint32_t((swing.frames * 256 + 128) / speed) * 40, actor->player.x, actor->player.y);
             }
         } else if ((mode == kModeGH || mode == kModeBL || mode == kModeSC) && anim.frames) {
             const int stat = mode == kModeGH ? actor->player_combat.fhr : mode == kModeBL ? actor->player_combat.fbr : actor->player_combat.fcr;
@@ -434,12 +434,12 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
         // ponytail: FUN_004b9e90's check before the GH cry isn't traced.
         if (mode == kModeGH || mode == kModeDT) {
             const auto impact = d2d::rules::sound_ids::impact(actor->struck_class, mode == kModeDT);
-            cues.cue(impact.impact, now_ms, actor->player.x, actor->player.y);
-            cues.cue(impact.element, now_ms, actor->player.x, actor->player.y);
+            cues.cue_on(unit_key(kSoundOnPlayer, actor->id), impact.impact, now_ms, actor->player.x, actor->player.y);
+            cues.cue_on(unit_key(kSoundOnPlayer, actor->id), impact.element, now_ms, actor->player.x, actor->player.y);
             actor->struck_class = 0;
             if (const int cls = actor->character.character_class; cls >= 0 && cls < 7) {
                 const auto& voice = d2d::rules::sound_ids::kPlayerVoice[std::size_t(cls)];
-                cues.cue(mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y);
+                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y);
             }
         }
         // A block (FUN_004cb860): by the hit class the client last had (unit +0xb0), the
@@ -461,11 +461,11 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             const int swing_ticks = (swing.frames * 256 + 128) / speed;
             const std::uint32_t start_at = now_ms + (skill->st_sound_delay ? std::uint32_t(std::max(swing_ticks - 3, 0)) * 40 : 0);
             const bool item = actor->item_cast && skill->item_cast_sound > 0;
-            cues.cue(item ? skill->item_cast_sound : skill->st_sound, start_at, actor->player.x, actor->player.y);
-            if (skill->weapon_sound) cues.cue(swing.sound, now_ms + std::uint32_t(swing_ticks) * 40, actor->player.x, actor->player.y);
+            cues.cue_on(unit_key(kSoundOnPlayer, actor->id), item ? skill->item_cast_sound : skill->st_sound, start_at, actor->player.x, actor->player.y);
+            if (skill->weapon_sound) cues.cue_on(unit_key(kSoundOnPlayer, actor->id), swing.sound, now_ms + std::uint32_t(swing_ticks) * 40, actor->player.x, actor->player.y);
             const int cls = actor->character.character_class;
             if (!item && cls >= 0 && std::size_t(cls) < kClassCode.size() && skill->cls == kClassCode[std::size_t(cls)])
-                cues.cue(skill->st_sound_class, start_at, actor->player.x, actor->player.y);
+                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), skill->st_sound_class, start_at, actor->player.x, actor->player.y);
         }
     }
 
@@ -474,9 +474,9 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
 auto Fight::do_sounds(std::uint32_t now_ms) -> void {
         const auto* skill = game_data->skills.get(actor->swing_skill);
         if (!skill) return;
-        cues.cue(skill->do_sound, now_ms, actor->player.x, actor->player.y);
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), skill->do_sound, now_ms, actor->player.x, actor->player.y);
         if (const int target = actor->attack_mon; target >= 0 && std::size_t(target) < monsters.size() && skill->tgt_sound > 0)
-            cues.cue(skill->tgt_sound, now_ms, monsters[std::size_t(target)].unit.x, monsters[std::size_t(target)].unit.y);
+            cues.cue_on(unit_key(kSoundOnMonster, monsters[std::size_t(target)].id), skill->tgt_sound, now_ms, monsters[std::size_t(target)].unit.x, monsters[std::size_t(target)].unit.y);
     }
 
 auto Fight::dead() const -> bool { return actor->pmode == kModeDT || actor->pmode == kModeDD; }
@@ -654,7 +654,7 @@ auto Fight::need_mana(std::uint32_t now_ms) -> void {
             "paladin_needmana_1", "barbarian_needmana_1", "druid_needmana_1", "assassin_needmana_1" };
         if (now_ms < actor->need_mana_until) return;
         actor->need_mana_until = now_ms + 75 * 40;
-        cues.cue(kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
     }
 
 auto Fight::start_swing(std::uint32_t now_ms) -> bool {
@@ -851,8 +851,8 @@ auto Fight::land(std::size_t monster_index, const d2d::rules::Blow& blow, bool b
             const auto life_before = life, mana_before = mana;
             life = std::min(actor->character.stats.values[kMaxLife], life + (std::int64_t(blow.life) << 8));
             mana = std::min(actor->character.stats.values[kMaxMana], mana + (std::int64_t(blow.mana) << 8));
-            if (life > life_before) cues.cue("impact_steal_life", now_ms, actor->player.x, actor->player.y);
-            if (mana > mana_before) cues.cue("impact_steal_mana", now_ms, actor->player.x, actor->player.y);
+            if (life > life_before) cues.cue_on(unit_key(kSoundOnPlayer, actor->id), "impact_steal_life", now_ms, actor->player.x, actor->player.y);
+            if (mana > mana_before) cues.cue_on(unit_key(kSoundOnPlayer, actor->id), "impact_steal_mana", now_ms, actor->player.x, actor->player.y);
         }
         // One poison at a time, the stronger wins (FUN_0057ac50); at 0 life
         // the monster dies to it, the kill the poisoner's (FUN_005a6920).
@@ -945,7 +945,7 @@ auto Fight::strike(std::uint32_t now_ms) -> void {
             // event-3 ones, before some of its thrusts.
             if (const auto* skill = game_data->skills.get(actor->swing_skill); skill && skill->clt_do_func == 16)
                 for (const int sounds = seq_events(now_ms, 3); actor->seq_sounded < sounds; ++actor->seq_sounded)
-                    cues.cue(skill->do_sound_a, now_ms, actor->player.x, actor->player.y);
+                    cues.cue_on(unit_key(kSoundOnPlayer, actor->id), skill->do_sound_a, now_ms, actor->player.x, actor->player.y);
             const int due = seq_events(now_ms);
             while (actor->seq_struck < due) {
                 ++actor->seq_struck;
@@ -1363,7 +1363,7 @@ auto Fight::absorb(const Foe& foe, std::uint32_t now_ms) -> int {
             if (can > 0 && actor->character.character_class == 1) {
                 static constexpr std::array<std::string_view, 5> kEnergyShieldHits = { "sorceress_energyshield_hit_1", "sorceress_energyshield_hit_2",
                     "sorceress_energyshield_hit_3", "sorceress_energyshield_hit_4", "sorceress_energyshield_hit_5" };
-                cues.cue(kEnergyShieldHits[std::size_t(sound_rng(int(kEnergyShieldHits.size())))], now_ms, actor->player.x, actor->player.y);
+                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kEnergyShieldHits[std::size_t(sound_rng(int(kEnergyShieldHits.size())))], now_ms, actor->player.x, actor->player.y);
             }
         }
         return damage;
@@ -4567,12 +4567,12 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
                 const int phase = int((std::uint64_t(now_ms - missile.born) * std::uint32_t(missile.info->anim_speed)) / (40u * 16u));
                 const int length = std::max(missile.info->anim_len, 1);
                 if (missile.info->prog_sound > 0 && phase % length == length - 2 && phase != missile.prog_sound_phase) {
-                    cues.cue(missile.info->prog_sound, now_ms, missile.x, missile.y);
+                    cues.cue_on(missile.sound ? unit_key(kSoundOnMissile, missile.sound) : 0, missile.info->prog_sound, now_ms, missile.x, missile.y);
                     missile.prog_sound_phase = phase;
                 }
                 if (missile.sound == 0) {
                     missile.sound = ++missile_sounds;
-                    cues.cue(missile.info->travel_sound, now_ms, missile.x, missile.y, missile.sound);
+                    cues.cue_on(unit_key(kSoundOnMissile, missile.sound), missile.info->travel_sound, now_ms, missile.x, missile.y, missile.sound);
                 }
                 flying.push_back({ missile.sound, missile.dies, missile.x, missile.y, missile.info->hit_sound });
             }
@@ -4611,7 +4611,7 @@ auto Fight::world(bool in_moor, std::uint32_t now_ms, float elapsed, const Crowd
             }
             for (const auto& flown : flying)
                 if (now_ms < flown.dies && !std::ranges::contains(missiles, flown.sound, &Missile::sound))
-                    cues.cue(flown.hit_sound, now_ms, flown.x, flown.y);
+                    cues.cue_on(unit_key(kSoundOnMissile, flown.sound), flown.hit_sound, now_ms, flown.x, flown.y);
             std::ranges::move(pending, std::back_inserter(missiles));
             pending.clear();
             for (auto& monster : monsters) {
@@ -4695,7 +4695,7 @@ auto Fight::hurt_side(std::span<Foe> side, std::uint32_t now_ms) -> void {
                             land(j, blow, true, now_ms);
                         }
                 }
-                if (actor->character.character_class == 4) cues.cue("barbarian_leap_land", now_ms, actor->player.x, actor->player.y);
+                if (actor->character.character_class == 4) cues.cue_on(unit_key(kSoundOnPlayer, actor->id), "barbarian_leap_land", now_ms, actor->player.x, actor->player.y);
                 actor->leap.reset();
             }
         }

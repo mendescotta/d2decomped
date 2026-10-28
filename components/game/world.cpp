@@ -523,7 +523,7 @@ auto World::operate(int npc_index, std::uint32_t now_ms, int force ) -> void {  
             if (key == actor->character.items.end()) { d2d::log::info("I need a key."); return; }
             if (key->quantity > 1) --key->quantity;
             else actor->character.items.erase(key);
-            cues.cue("item_key_used", now_ms, actor->player.x, actor->player.y);
+            cues.cue_on(unit_key(kSoundOnPlayer, actor->id), "item_key_used", now_ms, actor->player.x, actor->player.y);
         }
         // The Moldy Tome (OperateFn 6, FUN_00594e70): opens once (mode 0 → 1),
         // read every time while the quest's on: message 127 to the player
@@ -807,7 +807,7 @@ auto World::operate(int npc_index, std::uint32_t now_ms, int force ) -> void {  
                 auto& monster = fight.monsters[std::size_t(best)];
                 const auto boss = d2d::rules::roll_boss(game_data->umods, game_data->monsters.types[std::size_t(monster.type)], diff, true, rng);
                 make_boss(*game_data, monster, boss.kind, boss.mods, -1, boss.name_seed, diff, rng, int(players.size()));
-                cues.cue("object_shrine_jail", now_ms, monster.unit.x, monster.unit.y);
+                cues.cue_on(unit_key(kSoundOnMonster, monster.id), "object_shrine_jail", now_ms, monster.unit.x, monster.unit.y);
                 d2d::log::info("warping shrine: {} is now a {}", monster.npc.name, boss.kind == d2d::rules::Boss::champion ? "champion" : "unique");
             }
         }
@@ -1732,7 +1732,7 @@ auto World::find_voice(std::uint32_t tick_ms) -> void {
 auto World::class_cue(std::string_view line, std::uint32_t at_ms) -> void {
         static constexpr std::array<const char*, 7> kClass{ "amazon", "sorceress", "necromancer", "paladin", "barbarian", "druid", "assassin" };
         actor->voice_at = std::max(actor->voice_at, at_ms);
-        if (actor->character.header.cls < kClass.size()) cues.cue(std::format("{}_{}", kClass[actor->character.header.cls], line), at_ms, actor->player.x, actor->player.y);
+        if (actor->character.header.cls < kClass.size()) cues.cue_on(unit_key(kSoundOnPlayer, actor->id), std::format("{}_{}", kClass[actor->character.header.cls], line), at_ms, actor->player.x, actor->player.y);
     }
 
 auto World::music_cue(std::string_view sound) -> void {
@@ -1979,7 +1979,7 @@ auto World::read_portal(std::vector<d2d::d2s::Item>::iterator scroll, std::uint3
         if (!fight.cast_scroll(book ? 220 : 219, now_ms)) return;
         if (book) --scroll->quantity;
         else actor->character.items.erase(scroll);
-        cues.cue("player_townportal_cast", now_ms, actor->player.x, actor->player.y);
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), "player_townportal_cast", now_ms, actor->player.x, actor->player.y);
     }
 
 auto World::open_portal(std::uint32_t now_ms) -> void { open_portal_at(actor->player.x, actor->player.y + 0.6f, now_ms); }
@@ -2004,7 +2004,7 @@ auto World::use_portal(std::uint32_t now_ms) -> void {
             return;
         }
         if (host_warps) { actor->take_portal = -1; return; }   // joined: the host's portal moves us (it may refuse: a quest's level), its reassign brings us
-        cues.cue("player_townportal_enter", now_ms, actor->player.x, actor->player.y);
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), "player_townportal_enter", now_ms, actor->player.x, actor->player.y);
         if (actor->take_portal == 2) {                       // to Tristram, by its own portal back (object 60)
             actor->take_portal = -1;
             const Level* tristram = game_data->level(d2d::rules::CainQuest::kTristram);
@@ -2648,7 +2648,7 @@ auto World::footstep_frame(std::uint32_t tick_ms) -> void {
         if (!footfall(pos, rate, length, count, 0)) return;
         if (tick_ms - actor->step_sound_ms < std::uint32_t(2 * length / (count * rate) / 3) * 40) return;
         actor->step_sound_ms = tick_ms;
-        cues.cue(footstep(kPlayerVoice[std::size_t(cls)].step, fight.floor_material_at(actor->player.x, actor->player.y), run), tick_ms, actor->player.x, actor->player.y);
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), footstep(kPlayerVoice[std::size_t(cls)].step, fight.floor_material_at(actor->player.x, actor->player.y), run), tick_ms, actor->player.x, actor->player.y);
     }
 
 // FUN_00623f50's walk %: velocitypercent (100; running, run x 100 / walk),
@@ -2707,7 +2707,7 @@ auto World::tick(std::span<const Order> orders, std::uint32_t now_ms, std::uint3
         if (const auto wanderer = std::ranges::find_if(fight.monsters, [](const Monster& monster) { return monster.gone && monster.type == d2d::rules::monster_ids::kDarkWanderer; });
             !afterglow_made && wanderer != fight.monsters.end() && !game_data->afterglow.code.empty()) {
             afterglow_made = true;
-            cues.cue("object_wanderer_fissure", now_ms, wanderer->unit.x, wanderer->unit.y);
+            cues.cue_on(unit_key(kSoundOnMonster, wanderer->id), "object_wanderer_fissure", now_ms, wanderer->unit.x, wanderer->unit.y);
             static constexpr std::array<std::pair<int, int>, 8> kAround{ { { -3, -3 }, { -3, 0 }, { -3, 3 }, { 0, -3 }, { 0, 3 }, { 3, -3 }, { 3, 0 }, { -3, 3 } } };
             for (auto at = std::size_t(fight.spawning.quests.next() & 1); at < kAround.size(); ++at) {
                 const auto [x, y] = level->nearest_free(wanderer->unit.x + float(kAround[at].first) / 5, wanderer->unit.y + float(kAround[at].second) / 5);
@@ -2844,7 +2844,7 @@ auto World::tick(std::span<const Order> orders, std::uint32_t now_ms, std::uint3
                         auto lines = quest_talk(npc.hc_idx);
                         // Its greeting as the menu opens (FUN_004b66b0, kind 0), unless it has news to tell.
                         // ponytail: kind 2's "return" (the talk record's +0x12 flag) isn't traced.
-                        if (!std::ranges::any_of(lines, &d2d::rules::QuestMsg::greet)) cues.cue(greet_sound(npc, 0), now_ms, actor->player.x, actor->player.y);
+                        if (!std::ranges::any_of(lines, &d2d::rules::QuestMsg::greet)) cues.cue_on(unit_key(kSoundOnMonster, -1 - actor->interact_npc), greet_sound(npc, 0), now_ms, actor->player.x, actor->player.y);
                         actor->events.push_back(ev::OpenUI{ ev::OpenUI::talk, actor->interact_npc, std::move(lines) });
                     }
                     actor->player.walking = false; actor->interact_npc = -1;
@@ -2923,7 +2923,7 @@ auto World::tick(std::span<const Order> orders, std::uint32_t now_ms, std::uint3
         // ponytail: an NPC with news greets the first player.
         npc_patrol(*game_data, *level, npc_states, talking, now_ms, elapsed, crowd, &lead().player, arcane.guard_state == 2);
         for (std::size_t i = 0; i < npc_states.size() && i < level->npcs.size(); ++i)
-            if (std::exchange(npc_states[i].greets, false)) cues.cue(greet_sound(level->npcs[i], 1), now_ms, lead().player.x, lead().player.y);
+            if (std::exchange(npc_states[i].greets, false)) cues.cue_on(unit_key(kSoundOnMonster, -1 - int(i)), greet_sound(level->npcs[i], 1), now_ms, lead().player.x, lead().player.y);
         cain_step(now_ms, elapsed);
         for (const auto& neighbour : level->nearby) {           // over the edge, still in play
             auto& states = other_npcs[neighbour.level];
