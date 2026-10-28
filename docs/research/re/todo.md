@@ -119,6 +119,7 @@ table above.
 
 ## Keeping it current
 
-When a row is done, delete it here and note it where its doc says
+When a row is done, retain it here as resolved, update its stable entry in
+`docs/research/ledger/`, and note it where its doc says
 (unverified.md's "Traced", deviations.md's "matched since", the PLAN
 checkpoint). Re-run `tools/sound_coverage.py` and `tools/anim_coverage.py` and update the counts.

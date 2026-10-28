@@ -1,0 +1,364 @@
+schema_version = 1
+indexed_at_commit = "564ec10df20260d56bceaf131d9c1caa5bc61543"
+imported_on = "2026-10-28"
+provenance = "M0 source tables; CodeRabbit audit dated 2026-10-27, reported fixes not reverified"
+
+[[entry]]
+id = "UV-0001"
+title = "DC6/DCC frame anchor: bottom-left, `top = y_offset - height + 1`"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "apps/d2d/common.hpp `blit_at_anchor`"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:DC6/DCC frame anchor: bottom-left, `top = y_offset - height + 1`"]
+links = ["REQ-0119"]
+source_key = "unverified:Not yet traced in game.exe:DC6/DCC frame anchor: bottom-left, `top = y_offset - height + 1`"
+source_sha256 = "5713391ef865de1f9a9ada2e8509051cdeb6b8d5203996e343cf78d845149db6"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["DC6/DCC frame anchor: bottom-left, `top = y_offset - height + 1`", "apps/d2d/common.hpp `blit_at_anchor`", "OpenDiablo2 dcc_direction_frame.go", "char-create fire.dc6 (oy=132, heights vary) lands on its logs with FUN_005005b0 subtracting frame 0's offsets; the camp fire RB sits in its ring", "the DC6/DCC blitters (D2Gfx part)"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0002"
+title = "COF transparent layers: which alpha draw effects 0..2 are"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "apps/d2d/world_view.hpp `draw_mode`"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:COF transparent layers: which alpha draw effects 0..2 are"]
+links = ["REQ-0120"]
+source_key = "unverified:Not yet traced in game.exe:COF transparent layers: which alpha draw effects 0..2 are"
+source_sha256 = "809551b70a71c50db5ce534e150de54645d5b7eb3c6a2472acc2ed62292b9eb5"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["COF transparent layers: which alpha draw effects 0..2 are", "apps/d2d/world_view.hpp `draw_mode`", "OpenDiablo2's naming", "none", "the composite draw's blend switch (after `FUN_00470ec0`)"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0003"
+title = "DCC format as a whole"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/dcc/dcc.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:DCC format as a whole"]
+links = ["REQ-0121"]
+source_key = "unverified:Not yet traced in game.exe:DCC format as a whole"
+source_sha256 = "c8b6a4a6e53f678690a5d3017362b4de019d8d23bdb3b27db754d49775d52986"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["DCC format as a whole", "components/dcc/dcc.hpp", "OpenDiablo2's reader, Necrolis' notes", "every DCC in the MPQs decodes and draws as the game shows it", "the DCC decoder (D2Cmp part)"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0004"
+title = "DS1 layer stream order"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/ds1/ds1.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:DS1 layer stream order"]
+links = ["REQ-0122"]
+source_key = "unverified:Not yet traced in game.exe:DS1 layer stream order"
+source_sha256 = "5ca77fc11e21cdd27e0e785e190ab26f446b29e178bbd3a24087ff0fa8a40435"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["DS1 layer stream order", "components/ds1/ds1.hpp", "OpenDiablo2's reader", "every DS1 parses to its exact size", "the DS1 loader (`FUN_00665950` area)"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0005"
+title = "Character-create name filter: letters, one ' - _ not first or last, 2..15"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "apps/d2d/main.cpp Screen::CharCreate"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:Character-create name filter: letters, one ' - _ not first or last, 2..15"]
+links = ["REQ-0123"]
+source_key = "unverified:Not yet traced in game.exe:Character-create name filter: letters, one ' - _ not first or last, 2..15"
+source_sha256 = "6e70fa63e68018123fd4e8e4001bacd1e39ad098ac75ab4d00a6f6f27fed8dc0"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["Character-create name filter: letters, one ' - _ not first or last, 2..15", "apps/d2d/main.cpp Screen::CharCreate", "the TCP host's join check (FUN_0052c5b0)", "\"Bob Bitchen\" (a space) got no answer from a live host", "the create screen's edit box / OK handler"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0006"
+title = "DT1 block y-shift, `max(0, -min(block.y))`"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/dt1/dt1.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:DT1 block y-shift, `max(0, -min(block.y))`"]
+links = ["REQ-0124"]
+source_key = "unverified:Not yet traced in game.exe:DT1 block y-shift, `max(0, -min(block.y))`"
+source_sha256 = "9d08eee88d799454418ac6d264edd2d30f3ed4f5d582a376e81bcdf27382ac30"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["DT1 block y-shift, `max(0, -min(block.y))`", "components/dt1/dt1.hpp", "OpenDiablo2's renderer", "tiles draw seamlessly", "the DT1 loader / tile blitter"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0007"
+title = "pal.dat is BGR triples"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/palette/palette.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:pal.dat is BGR triples"]
+links = ["REQ-0125"]
+source_key = "unverified:Not yet traced in game.exe:pal.dat is BGR triples"
+source_sha256 = "1d390a5b5d9dacffef824632cd6ab2ca76109f68b17bd7b08474e432ec832060"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["pal.dat is BGR triples", "components/palette/palette.hpp", "OpenDiablo2's d2dat.Load", "colours match the game's screens", "the palette loader"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0008"
+title = "TBL values are Latin-1 bytes"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/tbl/tbl.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:TBL values are Latin-1 bytes"]
+links = ["REQ-0126"]
+source_key = "unverified:Not yet traced in game.exe:TBL values are Latin-1 bytes"
+source_sha256 = "b63897eb1feab49c76f858924b24139e9fcf36d52ad967ab564b55aad9384b8b"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["TBL values are Latin-1 bytes", "components/tbl/tbl.hpp", "OpenD2's Latin path", "English strings read right", "`.\\StrTable\\strtable.cpp`'s reader"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0009"
+title = ".d2s header layout"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/d2s/d2s.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:.d2s header layout"]
+links = ["REQ-0127"]
+source_key = "unverified:Not yet traced in game.exe:.d2s header layout"
+source_sha256 = "baa7706e749b4c2afe49d45dcecd02662565f6389ec489bc88b870c3d2358443"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = [".d2s header layout", "components/d2s/d2s.hpp", "the Phrozen Keep d2s spec", "19 real 1.14d saves (test_d2s)", "the save reader"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0010"
+title = ".d2s item bitstream layout"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/d2s/d2s_items.hpp"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:.d2s item bitstream layout"]
+links = ["REQ-0128"]
+source_key = "unverified:Not yet traced in game.exe:.d2s item bitstream layout"
+source_sha256 = "706fafcd6885d662bf03907dadab2413f1d2f55fb6ebb9f7705959b56ac017fc"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = [".d2s item bitstream layout", "components/d2s/d2s_items.hpp", "the community d2s spec", "19 real saves: every list ends on the next \"JM\"", "the item (de)serializer"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0011"
+title = "PL2 layout past the base palette"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "docs/research/formats/pl2.md"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:PL2 layout past the base palette"]
+links = ["REQ-0129"]
+source_key = "unverified:Not yet traced in game.exe:PL2 layout past the base palette"
+source_sha256 = "e74fcf85662dd58182a6206a9b98e8b392c1e4953ee18e23219440d762ffc5ac"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["PL2 layout past the base palette", "docs/research/formats/pl2.md", "OpenDiablo2's d2pl2", "probing menu1/Pal.PL2", "the PL2 loader"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0012"
+title = "Packet names"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "docs/research/re/network.md"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:Packet names"]
+links = ["REQ-0130"]
+source_key = "unverified:Not yet traced in game.exe:Packet names"
+source_sha256 = "65eb2c36a0f4d6ea3858a6d1c6a89e43042d018c797412505af8879f86208d14"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["Packet names", "docs/research/re/network.md", "the community's (d2-clientless, D2MOO)", "handlers marked ✓ were read", "names only; behaviour is from the handlers"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0013"
+title = "Charsi's Imbue pick: after the menu, the next item click takes the item up and imbues it"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "apps/d2d/town.cpp `imbue_with`"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:Charsi's Imbue pick: after the menu, the next item click takes the item up and imbues it"]
+links = ["REQ-0131"]
+source_key = "unverified:Not yet traced in game.exe:Charsi's Imbue pick: after the menu, the next item click takes the item up and imbues it"
+source_sha256 = "861d9fa7c52c3f70feb34424e3ac1b4b832087f1f48aaf5e0788f8807d435286"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["Charsi's Imbue pick: after the menu, the next item click takes the item up and imbues it", "apps/d2d/town.cpp `imbue_with`", "the identify pick's pattern", "0x4b35b0 opens the inventory in UI mode 7; the server imbues the cursor item (act1-end.md)", "the panel's click path, 0x4c0620 / 0x4c01e0"]
+source_kind = "documented"
+
+[[entry]]
+id = "UV-0014"
+title = "Throw has level 1 only while a throwable is held (the picker offers it then)"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "components/game/fight.hpp `skill_base_level`"
+status = "unknown"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Not yet traced in game.exe:Throw has level 1 only while a throwable is held (the picker offers it then)"]
+links = ["REQ-0132"]
+source_key = "unverified:Not yet traced in game.exe:Throw has level 1 only while a throwable is held (the picker offers it then)"
+source_sha256 = "09c45b62fd8853769c120cc2df6255ca4c832f2b10fbaa6b6c4003eaf49872b7"
+source_columns = ["What", "Where in d2d", "Source", "Evidence so far", "Trace in game.exe"]
+source_cells = ["Throw has level 1 only while a throwable is held (the picker offers it then)", "components/game/fight.hpp `skill_base_level`", "the D2 picker's look", "every player has Throw (Skills.txt general); `FUN_004d9fc0` greys what the weapon can't use", "`FUN_004d9fc0`, the start skills a new character gets"]
+source_kind = "documented"
+
+[[entry]]
+id = "TRACED-0001"
+title = "MonStats AI Idle (the cow): stands, never chases"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "unknown; see source row"
+status = "traced"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Traced:MonStats AI Idle (the cow): stands, never chases"]
+links = ["REQ-0133"]
+source_key = "unverified:Traced:MonStats AI Idle (the cow): stands, never chases"
+source_sha256 = "2dd521f619d5b1dd3c0c66355730b972c7799f2e88068a2980f6b05357f6cfdd"
+source_columns = ["What", "Traced in", "Doc"]
+source_cells = ["MonStats AI Idle (the cow): stands, never chases", "`FUN_005b0cd0` (MonAI row 1, search type 0): stand 200 in a room", "monster-ai.md \"Idle\""]
+source_kind = "documented"
+
+[[entry]]
+id = "TRACED-0002"
+title = "Iso projection: a subtile is (x - y) * 16, (x + y) * 8; units centre on H/2 - 8, floors on the view less the 40-pixel panel"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "unknown; see source row"
+status = "traced"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Traced:Iso projection: a subtile is (x - y) * 16, (x + y) * 8; units centre on H/2 - 8, floors on the view less the 40-pixel panel"]
+links = ["REQ-0134"]
+source_key = "unverified:Traced:Iso projection: a subtile is (x - y) * 16, (x + y) * 8; units centre on H/2 - 8, floors on the view less the 40-pixel panel"
+source_sha256 = "58d296b8e6d6e07229ed3d2b0babc83702a95898340ddba579465c45be5fe8e8"
+source_columns = ["What", "Traced in", "Doc"]
+source_cells = ["Iso projection: a subtile is (x - y) * 16, (x + y) * 8; units centre on H/2 - 8, floors on the view less the 40-pixel panel", "`FUN_00643260`, `FUN_00643310`, `FUN_0045b440` / `FUN_0045afd0`, `FUN_0044c990` / `FUN_00476000`, `FUN_004de730`", "apps/d2d/common.hpp `kViewY`"]
+source_kind = "documented"
+
+[[entry]]
+id = "TRACED-0003"
+title = "COF priority row for a direction (round the compass, not DCC order)"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "unknown; see source row"
+status = "traced"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Traced:COF priority row for a direction (round the compass, not DCC order)"]
+links = ["REQ-0135"]
+source_key = "unverified:Traced:COF priority row for a direction (round the compass, not DCC order)"
+source_sha256 = "554eabedf815d2d9575f5de79bbe0f30820a09d268963e4c2d95024659faaa78"
+source_columns = ["What", "Traced in", "Doc"]
+source_cells = ["COF priority row for a direction (round the compass, not DCC order)", "`FUN_00470ec0`, `FUN_004db2e0`, `FUN_00600e20` (0x6e55a0), `FUN_004db110`", "cof-draw-order.md"]
+source_kind = "documented"
+
+[[entry]]
+id = "TRACED-0004"
+title = "Object animation length: Objects.txt FrameCnt[mode] (not the COF / AnimData), held on the last frame without CycleAnim, else back to Start[mode]"
+subsystem = "unclassified"
+original_behavior = "unknown; see source evidence and trace target"
+port_behavior = "unknown; see source row"
+status = "traced"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/unverified.md"]
+tests = []
+aliases = ["unverified:Traced:Object animation length: Objects.txt FrameCnt[mode] (not the COF / AnimData), held on the last frame without CycleAnim, else back to Start[mode]"]
+links = ["REQ-0136"]
+source_key = "unverified:Traced:Object animation length: Objects.txt FrameCnt[mode] (not the COF / AnimData), held on the last frame without CycleAnim, else back to Start[mode]"
+source_sha256 = "f7143b39a408fe6be974c32e749e3305843b384a8debbc3669e440947ea43d26"
+source_columns = ["What", "Traced in", "Doc"]
+source_cells = ["Object animation length: Objects.txt FrameCnt[mode] (not the COF / AnimData), held on the last frame without CycleAnim, else back to Start[mode]", "`FUN_004bcbb0`", "objects.md \"Animation length\""]
+source_kind = "documented"

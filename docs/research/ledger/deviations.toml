@@ -1,0 +1,704 @@
+schema_version = 1
+indexed_at_commit = "564ec10df20260d56bceaf131d9c1caa5bc61543"
+imported_on = "2026-10-28"
+provenance = "M0 source tables; CodeRabbit audit dated 2026-10-27, reported fixes not reverified"
+
+[[entry]]
+id = "DI-0001"
+title = "The light grid's size"
+subsystem = "unclassified"
+original_behavior = "48 × 48 subtiles round the player (±24): a light further off adds nothing, and at 800 × 600 the view's corners read the grid's clamped edge (bugs.md #11)"
+port_behavior = "Sized to the view's corners plus the widest light (18 subtiles)"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:1"]
+links = ["REQ-0035"]
+source_key = "deviations:Improvements:1"
+source_sha256 = "a6e0febb92d81aecc13035bcaf7ecdcd354142812161f9991ba9636452930fbc"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["1", "The light grid's size", "48 × 48 subtiles round the player (±24): a light further off adds nothing, and at 800 × 600 the view's corners read the grid's clamped edge (bugs.md #11)", "Sized to the view's corners plus the widest light (18 subtiles)", "Lights stay lit wherever they are on screen, at any resolution", "yes: torches glow from the screen's edges; `--toggle light_grid=off` for game.exe's", "light.hpp `LightGrid`, town.hpp `frame_light`, lighting.md"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0002"
+title = "A save's map id of 0"
+subsystem = "unclassified"
+original_behavior = "Reused as the seed (a map from seed 0)"
+port_behavior = "Treated as \"none\": the run's random seed"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:2"]
+links = ["REQ-0036"]
+source_key = "deviations:Improvements:2"
+source_sha256 = "efe11508745ac5e3e966e17fae9bc7cf81b967b5d73ca27792ad230c8fff8873"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["2", "A save's map id of 0", "Reused as the seed (a map from seed 0)", "Treated as \"none\": the run's random seed", "d2d's early saves wrote 0", "only for those saves", "main.cpp `game_seed`, drlg.md"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0003"
+title = "A wrapped tint byte (Transform 8)"
+subsystem = "unclassified"
+original_behavior = "Read back as Transform 8 (`FUN_005038d0`)"
+port_behavior = "The same"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:3"]
+links = ["REQ-0037"]
+source_key = "deviations:Improvements:3"
+source_sha256 = "10a6766565867b53b8974cec8a1518580a0ba3d6a23bd9fe10fb9c38024993b4"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["3", "A wrapped tint byte (Transform 8)", "Read back as Transform 8 (`FUN_005038d0`)", "The same", "—", "no", "matched since ab51cf0: not a deviation after all (bugs.md #12)"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0004"
+title = "Roofs over the player"
+subsystem = "unclassified"
+original_behavior = "Drawn whole: a player under a roof or behind a tent top is hidden (walls in front fade to half, roofs never do; walls.md)"
+port_behavior = "A soft circle round the player's body (radius 70 px) shows through roofs: a quarter of the roof in the inner half, back to solid at the rim. `--toggle trans_roof=off` turns it off"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:4"]
+links = ["REQ-0038"]
+source_key = "deviations:Improvements:4"
+source_sha256 = "3fdfcfad59db35eb0bea9b92a4c2c993d122f97a1c1b3e85562aa6930dce67bc"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["4", "Roofs over the player", "Drawn whole: a player under a roof or behind a tent top is hidden (walls in front fade to half, roofs never do; walls.md)", "A soft circle round the player's body (radius 70 px) shows through roofs: a quarter of the roof in the inner half, back to solid at the rim. `--toggle trans_roof=off` turns it off", "Keep the player, and loot on a hut's floor, in sight", "yes", "world.hpp `Hole`, `g_roof_cutout`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0005"
+title = "Gold on the ground"
+subsystem = "unclassified"
+original_behavior = "Picked up only by clicking it"
+port_behavior = "Walking within half a cell of gold puts it in the purse (on by default). `--toggle autoloot=off` turns it off"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:5"]
+links = ["REQ-0039"]
+source_key = "deviations:Improvements:5"
+source_sha256 = "5c23eb81b9c27347f9edb6cebd7fee8d7254d6a94e3b45315b45bd8a98519809"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["5", "Gold on the ground", "Picked up only by clicking it", "Walking within half a cell of gold puts it in the purse (on by default). `--toggle autoloot=off` turns it off", "Less clicking for coins", "yes", "world.cpp `autoloot_gold`, main.cpp `g_autoloot`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0006"
+title = "A joined game's save-back (B3)"
+subsystem = "unclassified"
+original_behavior = "Written as it came: magic and size checked (`FUN_0045c520`)"
+port_behavior = "Written only when it parses as the same character with a good +0xc checksum; a .d2s.bak the first time; temp file + rename"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:6"]
+links = ["REQ-0040"]
+source_key = "deviations:Improvements:6"
+source_sha256 = "03998b2382fe7fa9a5c81d7774bd46fa15e345285a23995adc64ba26541158a1"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["6", "A joined game's save-back (B3)", "Written as it came: magic and size checked (`FUN_0045c520`)", "Written only when it parses as the same character with a good +0xc checksum; a .d2s.bak the first time; temp file + rename", "A broken or foreign save never replaces the player's own", "no", "character_store.hpp `save_bytes`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0007"
+title = "Party in a joined game"
+subsystem = "unclassified"
+original_behavior = "The party button: the player invites (0x5e 6) and accepts an invite (8) by hand"
+port_behavior = "d2d invites each other player once and accepts their invites itself (on by default; d2d has no party screen). `--toggle autoparty=off` turns it off"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:7"]
+links = ["REQ-0041"]
+source_key = "deviations:Improvements:7"
+source_sha256 = "14f61e60c405b89ad2b168011862dc5c6a14cad77a090a9383d19138419ece44"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["7", "Party in a joined game", "The party button: the player invites (0x5e 6) and accepts an invite (8) by hand", "d2d invites each other player once and accepts their invites itself (on by default; d2d has no party screen). `--toggle autoparty=off` turns it off", "Shared experience without a party UI", "yes", "netgame.cpp 0x8b, main.cpp `g_autoparty`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0008"
+title = "When the world loads"
+subsystem = "unclassified"
+original_behavior = "Built after char-select's OK, behind the loading screen"
+port_behavior = "Built behind the title: game tables, saves, sprites, then the town of the newest save's act (Act 1 until other acts exist) and the levels next to it (overlapping it, its warps, its walk links; in Act 1 that's the Blood Moor) for the newest save's map seed (the likely pick). Picking another character rebuilds for its seed (`set_map_seed`). No toggle"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:8"]
+links = ["REQ-0042"]
+source_key = "deviations:Improvements:8"
+source_sha256 = "63ae3d74ff6f4255d2e6378232a10d76f5c6d7c2b4e00d3807a32d0e029c26ae"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["8", "When the world loads", "Built after char-select's OK, behind the loading screen", "Built behind the title: game tables, saves, sprites, then the town of the newest save's act (Act 1 until other acts exist) and the levels next to it (overlapping it, its warps, its walk links; in Act 1 that's the Blood Moor) for the newest save's map seed (the likely pick). Picking another character rebuilds for its seed (`set_map_seed`). No toggle", "The usual pick is ready the moment OK is clicked", "yes: no wait after OK; the log shows those levels building on the title", "load.cpp `finish_scene`, main.cpp `set_map_seed`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0009"
+title = "A joined host that goes silent"
+subsystem = "unclassified"
+original_behavior = "Untraced (unverified: game.exe's own drop timeout)"
+port_behavior = "20 s with no packet from the host (it answers our 0x6d every 5 s) and d2d leaves for character select. No toggle"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:9"]
+links = ["REQ-0043"]
+source_key = "deviations:Improvements:9"
+source_sha256 = "8c553c887a78fd2cf9ab4bad52e677244864bc56098f059c94266b8754b86a79"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["9", "A joined host that goes silent", "Untraced (unverified: game.exe's own drop timeout)", "20 s with no packet from the host (it answers our 0x6d every 5 s) and d2d leaves for character select. No toggle", "A host that vanishes (its PC off or asleep) left d2d in a dead game for 18 min, until TCP gave up (live 2026-10-18)", "yes: back to character select", "netgame.cpp `kSilentMs`, main.cpp"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0010"
+title = "d2d's player far from the host's"
+subsystem = "unclassified"
+original_behavior = "Untraced (unverified: game.exe corrects by the host's 0x15 only)"
+port_behavior = "15+ subtiles apart for 2 s and d2d puts its player where the host has it. No toggle"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:10"]
+links = ["REQ-0044"]
+source_key = "deviations:Improvements:10"
+source_sha256 = "8382e79be93e7a35f711119d7f5701f88c49409c927235d795db0bebec7116db"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["10", "d2d's player far from the host's", "Untraced (unverified: game.exe corrects by the host's 0x15 only)", "15+ subtiles apart for 2 s and d2d puts its player where the host has it. No toggle", "d2d walked through doors only it had open and on floor the host's path won't take; the host is the truth", "yes: a jump back", "town.cpp `net_drift_ms`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0011"
+title = "Configure Controls' buttons"
+subsystem = "unclassified"
+original_behavior = "Cancel, Default, Accept, each a third of the panel (FUN_004a5060)"
+port_behavior = "A fourth, Gamepad / Keyboard, turns the list into the pad's page: its settings (left-handed sticks, swapped confirm, dead zone, cursor speed), two layouts, each action's two buttons; edits work as a key's do (a button leaves the action it clashed with), Accept keeps them in d2d.cfg `pad_*`. The four buttons take a quarter each. `--toggle pad_controls=off` turns it off"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:11"]
+links = ["REQ-0045"]
+source_key = "deviations:Improvements:11"
+source_sha256 = "a82b1b6aa5798b268f005476c0dd273dc35e6b04b5778c3499a84ecc079d24ea"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["11", "Configure Controls' buttons", "Cancel, Default, Accept, each a third of the panel (FUN_004a5060)", "A fourth, Gamepad / Keyboard, turns the list into the pad's page: its settings (left-handed sticks, swapped confirm, dead zone, cursor speed), two layouts, each action's two buttons; edits work as a key's do (a button leaves the action it clashed with), Accept keeps them in d2d.cfg `pad_*`. The four buttons take a quarter each. `--toggle pad_controls=off` turns it off", "game.exe has no pad (#33)", "yes", "controls.cpp, gamepad_map.hpp `Bindings`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0012"
+title = "The title's SINGLE PLAYER"
+subsystem = "unclassified"
+original_behavior = "Single player only; a joined game's players pick on their own machines"
+port_behavior = "\"SINGLE PLAYER / COOP\": with two or more external pads character select is local co-op's lobby, where each pad past the first picks its character before player 1 (alone) starts. `--toggle coop_lobby=off` turns it off"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:12"]
+links = ["REQ-0046"]
+source_key = "deviations:Improvements:12"
+source_sha256 = "674494a7b96b1b5309b8f3e8ab1c10fd079bae24983ff8036227ed1a654b5126"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["12", "The title's SINGLE PLAYER", "Single player only; a joined game's players pick on their own machines", "\"SINGLE PLAYER / COOP\": with two or more external pads character select is local co-op's lobby, where each pad past the first picks its character before player 1 (alone) starts. `--toggle coop_lobby=off` turns it off", "Couch co-op without picking characters mid-game", "yes", "lobby.cpp, frontend.cpp `title_ui`, local-coop.md \"The lobby\""]
+source_kind = "documented"
+
+[[entry]]
+id = "DI-0013"
+title = "Sounds under the paused game menu"
+subsystem = "unclassified"
+original_behavior = "Play on: a local game paused under the menu still runs the sound tick (`FUN_0044efa0` calls `FUN_00482c20`), so loops and ambience keep going"
+port_behavior = "The world's sounds, ambience and rain pause with the game and pick up where they were (on by default). `--toggle pause_sounds=off` turns it off"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Improvements:13"]
+links = ["REQ-0047"]
+source_key = "deviations:Improvements:13"
+source_sha256 = "85f68a0ddc0806b488fb69d04fee5782e820f3b44d9e9edd2efc13134f24b76a"
+source_columns = ["#", "What", "game.exe", "d2d", "Why", "Visible", "Where"]
+source_cells = ["13", "Sounds under the paused game menu", "Play on: a local game paused under the menu still runs the sound tick (`FUN_0044efa0` calls `FUN_00482c20`), so loops and ambience keep going", "The world's sounds, ambience and rain pause with the game and pick up where they were (on by default). `--toggle pause_sounds=off` turns it off", "Bret's playtest: a fire crackling on under the pause", "yes", "audio.hpp `pause_world`, main.cpp `g_pause_sounds`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0001"
+title = "Palette blends (additive and multiply missiles, blended shadows, half see-through rain)"
+subsystem = "unclassified"
+original_behavior = "PL2 tables: the nearest palette colour of the blend"
+port_behavior = "The blend in RGB"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:1"]
+links = ["REQ-0048"]
+source_key = "deviations:Approximations:1"
+source_sha256 = "88624e019cf6b8488c27d6f4f27c4a7ef286b5fae53ddb624ce6f235b4aba97a"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["1", "Palette blends (additive and multiply missiles, blended shadows, half see-through rain)", "PL2 tables: the nearest palette colour of the blend", "The blend in RGB", "slightly: colours off the palette", "world.hpp `blit_dcc_frame`, `blit_dt1_shadow`, ingame.hpp `draw_rain`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0002"
+title = "Lit tiles"
+subsystem = "unclassified"
+original_behavior = "32-pixel blocks, each bilinear between its four corner lights"
+port_behavior = "Each pixel bilinear between the subtile corners round the ground under it"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:2"]
+links = ["REQ-0049"]
+source_key = "deviations:Approximations:2"
+source_sha256 = "d28ef46134ef5de95ffe417d8626a0b2cb7252f2b1aecd3c1c2353eb3d143515"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["2", "Lit tiles", "32-pixel blocks, each bilinear between its four corner lights", "Each pixel bilinear between the subtile corners round the ground under it", "hardly", "world.hpp `blit_dt1_tile_lit`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0003"
+title = "Unit shadows"
+subsystem = "unclassified"
+original_behavior = "Each layer drawn through the alpha table (untraced whether overlaps darken twice)"
+port_behavior = "A composite darkens each pixel once"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:3"]
+links = ["REQ-0050"]
+source_key = "deviations:Approximations:3"
+source_sha256 = "18e5b5353c27d2d302d74c6d44f0a5de4aa1ab2d757120060496f8f7833ce232"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["3", "Unit shadows", "Each layer drawn through the alpha table (untraced whether overlaps darken twice)", "A composite darkens each pixel once", "hardly", "world.hpp `shadow_composite`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0004"
+title = "Light Quality"
+subsystem = "unclassified"
+original_behavior = "Drops to 0 or 1 by frame rate and the Video Options setting (fewer shadows, capped radii)"
+port_behavior = "Always high (2)"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:4"]
+links = ["REQ-0051"]
+source_key = "deviations:Approximations:4"
+source_sha256 = "b86712e47aa0d2285363c7a647347a10a3b23cac244d8332de8d1049dd686d67"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["4", "Light Quality", "Drops to 0 or 1 by frame rate and the Video Options setting (fewer shadows, capped radii)", "Always high (2)", "only on slow machines", "town.hpp `frame_light`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0005"
+title = "Static lights' shadows (type 2)"
+subsystem = "unclassified"
+original_behavior = "Cached from the collision map (`FUN_004750f0`)"
+port_behavior = "Not built (no such light in the Blood Moor)"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:5"]
+links = ["REQ-0052"]
+source_key = "deviations:Approximations:5"
+source_sha256 = "7de392dc642a0680eeecb2f69da17d0330ab03a4b290e236d020209b93783deb"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["5", "Static lights' shadows (type 2)", "Cached from the collision map (`FUN_004750f0`)", "Not built (no such light in the Blood Moor)", "not yet", "lighting.md"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0006"
+title = "Ambience at dusk and dawn"
+subsystem = "unclassified"
+original_behavior = "Cross-fades over 250 sound ticks (`FUN_004e42e0`)"
+port_behavior = "matched since this commit (`Audio::crossfade_ambience`)"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:6"]
+links = ["REQ-0053"]
+source_key = "deviations:Approximations:6"
+source_sha256 = "86e53583f157243d3fd82e57093339ec45768b1f1d016ef4d861d402128ebf4e"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["6", "Ambience at dusk and dawn", "Cross-fades over 250 sound ticks (`FUN_004e42e0`)", "matched since this commit (`Audio::crossfade_ambience`)", "—", "audio.hpp"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0007"
+title = "Rain's random rolls"
+subsystem = "unclassified"
+original_behavior = "The player unit's seed"
+port_behavior = "A client seed of its own"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:7"]
+links = ["REQ-0054"]
+source_key = "deviations:Approximations:7"
+source_sha256 = "7731cff9392958f8ec422c4179563c7f46b51ee721cc29c938bb794b2cb4e58b"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["7", "Rain's random rolls", "The player unit's seed", "A client seed of its own", "no (same odds)", "weather.hpp `Rain::rng`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0008"
+title = "Where a town portal opens by its caster"
+subsystem = "unclassified"
+original_behavior = "Nearest free spot from the caster, collision 0x3e01, size 3"
+port_behavior = "Nearest free spot 0.6 cells south of the player"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:8"]
+links = ["REQ-0055"]
+source_key = "deviations:Approximations:8"
+source_sha256 = "1b0cbd12f8c72c92c23fc0a6fc1f4e678e22dd5f3ee2230c9468a35154f8ea98"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["8", "Where a town portal opens by its caster", "Nearest free spot from the caster, collision 0x3e01, size 3", "Nearest free spot 0.6 cells south of the player", "slightly", "server.hpp `open_portal`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0009"
+title = "COF draw effects 0..2"
+subsystem = "unclassified"
+original_behavior = "Driver alpha modes (which of 25 / 50 / 75 % each is, untraced)"
+port_behavior = "Read as a quarter, half, three quarters"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:9"]
+links = ["REQ-0056"]
+source_key = "deviations:Approximations:9"
+source_sha256 = "91b308115cc6e6b2746a69d1a732b059bbacd2d650984d2520ed79f90e6a2a92"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["9", "COF draw effects 0..2", "Driver alpha modes (which of 25 / 50 / 75 % each is, untraced)", "Read as a quarter, half, three quarters", "only on layers that use them", "world.hpp `layer_trans`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0010"
+title = "JOIN GAME's address check"
+subsystem = "unclassified"
+original_behavior = "Connects once to test the host, and shows \"Cannot Connect to Server\" there (`FUN_00434790`)"
+port_behavior = "Goes straight to char-select; picking a character finds out, with the same popup and OK back to TCP/IP"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:10"]
+links = ["REQ-0057"]
+source_key = "deviations:Approximations:10"
+source_sha256 = "3759353fb4ae1af8b7da254d2c49b57e174cb396dd53d49afc16b36cbc66f49c"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["10", "JOIN GAME's address check", "Connects once to test the host, and shows \"Cannot Connect to Server\" there (`FUN_00434790`)", "Goes straight to char-select; picking a character finds out, with the same popup and OK back to TCP/IP", "yes: the error comes one screen later", "main.cpp `Screen::TcpIp`, tcpip-menu.md"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0011"
+title = "A host's refusal (B4)"
+subsystem = "unclassified"
+original_behavior = "Its message in Font42 over the game screen, since the join runs in the game loop (`FUN_0044cb60`)"
+port_behavior = "The same message in the OK popup on char-select"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:11"]
+links = ["REQ-0058"]
+source_key = "deviations:Approximations:11"
+source_sha256 = "301f6de469fc1902971487481c118cef68a917f2085d6e7762c040ca12d2fd41"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["11", "A host's refusal (B4)", "Its message in Font42 over the game screen, since the join runs in the game loop (`FUN_0044cb60`)", "The same message in the OK popup on char-select", "yes", "main.cpp `join_error_text`, tcpip-menu.md"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0012"
+title = "TCP/IP Options' own address"
+subsystem = "unclassified"
+original_behavior = "Read again every 5 s (record 0x10b)"
+port_behavior = "Read once as the screen opens"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:12"]
+links = ["REQ-0059"]
+source_key = "deviations:Approximations:12"
+source_sha256 = "dbd782af3e24f4793aab61c0d76c8c758792ece9ba895a373d8ca5979108d31e"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["12", "TCP/IP Options' own address", "Read again every 5 s (record 0x10b)", "Read once as the screen opens", "only if the network changes while it's up", "main.cpp `Screen::TcpIp`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DA-0013"
+title = "World sounds' pan, and a loop back in range"
+subsystem = "unclassified"
+original_behavior = "Pans by turning the far speaker down to (255 − pan) / 127 (`FUN_00515890`); a Tracking loop stopped past its far range waits, not freed, and starts again back in range (`FUN_004ba020`)"
+port_behavior = "matched since this commit: each world sound is two sources, one per speaker (`AL_SOFT_direct_channels`, `Audio::start_split`); without the extension OpenAL pans a mono source by its angle"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Approximations:13"]
+links = ["REQ-0060"]
+source_key = "deviations:Approximations:13"
+source_sha256 = "de26e66109276e15494bd66cd96a0b0d7d37e314d7e7894db1b2ebac2c914fe6"
+source_columns = ["#", "What", "game.exe", "d2d now", "Visible", "Where"]
+source_cells = ["13", "World sounds' pan, and a loop back in range", "Pans by turning the far speaker down to (255 − pan) / 127 (`FUN_00515890`); a Tracking loop stopped past its far range waits, not freed, and starts again back in range (`FUN_004ba020`)", "matched since this commit: each world sound is two sources, one per speaker (`AL_SOFT_direct_channels`, `Audio::start_split`); without the extension OpenAL pans a mono source by its angle", "only without the extension", "audio.hpp `apply_mix`"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0001"
+title = "`--seed`, `--headless`, `--devctl`, `--no-save`, `--no-video`, `--start-*`, `--toggle`"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:`--seed`, `--headless`, `--devctl`, `--no-save`, `--no-video`, `--start-*`, `--toggle`"]
+links = ["REQ-0061"]
+source_key = "deviations:Additions:`--seed`, `--headless`, `--devctl`, `--no-save`, `--no-video`, `--start-*`, `--toggle`"
+source_sha256 = "8dd63307f3644ada5ca5443af777de2aed2f01773231072d9f5f88488d544621"
+source_columns = ["What", "Why"]
+source_cells = ["`--seed`, `--headless`, `--devctl`, `--no-save`, `--no-video`, `--start-*`, `--toggle`", "Scripted tests and development; game.exe's own switches are kept (dropin_goal)"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0002"
+title = "The devctl channel and its `debug` verbs (docs/control_channel.md)"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:The devctl channel and its `debug` verbs (docs/control_channel.md)"]
+links = ["REQ-0062"]
+source_key = "deviations:Additions:The devctl channel and its `debug` verbs (docs/control_channel.md)"
+source_sha256 = "0e037d63b83458222ee4cbd215348df40f02b7bf28a2c69850f82e458bdcd749"
+source_columns = ["What", "Why"]
+source_cells = ["The devctl channel and its `debug` verbs (docs/control_channel.md)", "Driving the game in tests"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0003"
+title = "`D2D_ANIM_LOG=<file>`: each animation's first draw appended to the file (`Scene::note_drawn`)"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:`D2D_ANIM_LOG=<file>`: each animation's first draw appended to the file (`Scene::note_drawn`)"]
+links = ["REQ-0063"]
+source_key = "deviations:Additions:`D2D_ANIM_LOG=<file>`: each animation's first draw appended to the file (`Scene::note_drawn`)"
+source_sha256 = "44ce3107977def6fc094628b06b533f10487181383ade00b49e62f949cf7d68b"
+source_columns = ["What", "Why"]
+source_cells = ["`D2D_ANIM_LOG=<file>`: each animation's first draw appended to the file (`Scene::note_drawn`)", "Animation coverage (tools/anim_coverage.py); nothing is written when it isn't set"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0004"
+title = "Borderless fullscreen: Alt+Enter, `fullscreen = 1` in d2d.cfg, the launcher's Fullscreen box"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:Borderless fullscreen: Alt+Enter, `fullscreen = 1` in d2d.cfg, the launcher's Fullscreen box"]
+links = ["REQ-0064"]
+source_key = "deviations:Additions:Borderless fullscreen: Alt+Enter, `fullscreen = 1` in d2d.cfg, the launcher's Fullscreen box"
+source_sha256 = "465b652ff8b055eaee209a60c8cd25ee81889857593d434bdd3ca2a61e02bc78"
+source_columns = ["What", "Why"]
+source_cells = ["Borderless fullscreen: Alt+Enter, `fullscreen = 1` in d2d.cfg, the launcher's Fullscreen box", "game.exe's own display modes and `-w` aren't traced; borderless doesn't change the desktop's resolution"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0005"
+title = "Widescreen (`--widescreen`, `widescreen = 1`, `--view-width`): the in-game world draws wider than 800 pixels, at the window's aspect (at most 1400); the HUD and panels stay 800×600, centred. Off by default"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:Widescreen (`--widescreen`, `widescreen = 1`, `--view-width`): the in-game world draws wider than 800 pixels, at the window's aspect (at most 1400); the HUD and panels stay 800×600, centred. Off by default"]
+links = ["REQ-0065"]
+source_key = "deviations:Additions:Widescreen (`--widescreen`, `widescreen = 1`, `--view-width`): the in-game world draws wider than 800 pixels, at the window's aspect (at most 1400); the HUD and panels stay 800×600, centred. Off by default"
+source_sha256 = "7c528bc054a4cbd99d9f5f6719ae99c766193e41b89e9cdebcd292bbc2fa76de"
+source_columns = ["What", "Why"]
+source_cells = ["Widescreen (`--widescreen`, `widescreen = 1`, `--view-width`): the in-game world draws wider than 800 pixels, at the window's aspect (at most 1400); the HUD and panels stay 800×600, centred. Off by default", "Modern displays. A wider view shows more of the map than game.exe ever did (it is a client view only: monsters update 30 cells out, the host replicates 28, the view is at most 13 across); the UI isn't re-laid-out yet (#39)"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0006"
+title = "Local co-op: up to 4 players in one game on one screen (docs/design/local-coop.md). They are one party: experience, NoDrop and gold go by game.exe's party rules (party.md). One screen keeps them on one level: a warp, a portal, a level's edge or a respawn takes the whole party. Players walk through each other, and a step that would spread the party past one screen is undone (`World::leash`). Death with a partner alive makes a ghost (gear kept, D2's penalty) that a partner's Resurrect channel raises, or a town; everyone dead respawns in town as in single player. Quest credit is one rule for every quest (`World::credit_party`: what the acting player gained, a partner who hasn't done that quest gains), where game.exe has a callback per quest"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:Local co-op: up to 4 players in one game on one screen (docs/design/local-coop.md). They are one party: experience, NoDrop and gold go by game.exe's party rules (party.md). One screen keeps them on one level: a warp, a portal, a level's edge or a respawn takes the whole party. Players walk through each other, and a step that would spread the party past one screen is undone (`World::leash`). Death with a partner alive makes a ghost (gear kept, D2's penalty) that a partner's Resurrect channel raises, or a town; everyone dead respawns in town as in single player. Quest credit is one rule for every quest (`World::credit_party`: what the acting player gained, a partner who hasn't done that quest gains), where game.exe has a callback per quest"]
+links = ["REQ-0066"]
+source_key = "deviations:Additions:Local co-op: up to 4 players in one game on one screen (docs/design/local-coop.md). They are one party: experience, NoDrop and gold go by game.exe's party rules (party.md). One screen keeps them on one level: a warp, a portal, a level's edge or a respawn takes the whole party. Players walk through each other, and a step that would spread the party past one screen is undone (`World::leash`). Death with a partner alive makes a ghost (gear kept, D2's penalty) that a partner's Resurrect channel raises, or a town; everyone dead respawns in town as in single player. Quest credit is one rule for every quest (`World::credit_party`: what the acting player gained, a partner who hasn't done that quest gains), where game.exe has a callback per quest"
+source_sha256 = "33f25f10a309c48a65e33249eba796f8e2de084a806892e9f1ba55497f19d538"
+source_columns = ["What", "Why"]
+source_cells = ["Local co-op: up to 4 players in one game on one screen (docs/design/local-coop.md). They are one party: experience, NoDrop and gold go by game.exe's party rules (party.md). One screen keeps them on one level: a warp, a portal, a level's edge or a respawn takes the whole party. Players walk through each other, and a step that would spread the party past one screen is undone (`World::leash`). Death with a partner alive makes a ghost (gear kept, D2's penalty) that a partner's Resurrect channel raises, or a town; everyone dead respawns in town as in single player. Quest credit is one rule for every quest (`World::credit_party`: what the acting player gained, a partner who hasn't done that quest gains), where game.exe has a callback per quest", "Friends on one Steam Deck; game.exe has no shared-screen play"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0007"
+title = "Gamepads (SDL3; apps/d2d/README.md, docs/design/controller-plan.md): stick walking, soft targeting with the target hovered and an \"A  Talk\" prompt, the right stick aiming in the field, d-pad hops through every panel, shoulders through a menu's buttons, rebindable in d2d.cfg `pad_*` and Configure Controls' pad page"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:Gamepads (SDL3; apps/d2d/README.md, docs/design/controller-plan.md): stick walking, soft targeting with the target hovered and an \"A  Talk\" prompt, the right stick aiming in the field, d-pad hops through every panel, shoulders through a menu's buttons, rebindable in d2d.cfg `pad_*` and Configure Controls' pad page"]
+links = ["REQ-0067"]
+source_key = "deviations:Additions:Gamepads (SDL3; apps/d2d/README.md, docs/design/controller-plan.md): stick walking, soft targeting with the target hovered and an \"A  Talk\" prompt, the right stick aiming in the field, d-pad hops through every panel, shoulders through a menu's buttons, rebindable in d2d.cfg `pad_*` and Configure Controls' pad page"
+source_sha256 = "4fe73fc9e49a1e92a19f711e4372b54fae0579f4bc1331ac6544de5bf8fff2f6"
+source_columns = ["What", "Why"]
+source_cells = ["Gamepads (SDL3; apps/d2d/README.md, docs/design/controller-plan.md): stick walking, soft targeting with the target hovered and an \"A  Talk\" prompt, the right stick aiming in the field, d-pad hops through every panel, shoulders through a menu's buttons, rebindable in d2d.cfg `pad_*` and Configure Controls' pad page", "Couch and Steam Deck play; game.exe has no pad"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0008"
+title = "An NPC's windows (store, menu, speech) shut once the player is more than 2 cells (10 subtiles) from the NPC, as Esc (`Town::update`)"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:An NPC's windows (store, menu, speech) shut once the player is more than 2 cells (10 subtiles) from the NPC, as Esc (`Town::update`)"]
+links = ["REQ-0068"]
+source_key = "deviations:Additions:An NPC's windows (store, menu, speech) shut once the player is more than 2 cells (10 subtiles) from the NPC, as Esc (`Town::update`)"
+source_sha256 = "435b8c947a990c85d8401f3b707782c6f13558d334fb4565ee0bd8bf446bf0aa"
+source_columns = ["What", "Why"]
+source_cells = ["An NPC's windows (store, menu, speech) shut once the player is more than 2 cells (10 subtiles) from the NPC, as Esc (`Town::update`)", "game.exe's two panels cover its whole 800-pixel world, so it can't walk away with them open; a widescreen view or a click past them can. 2 cells is d2d's (game.exe talks within 6 subtiles)"]
+source_kind = "documented"
+
+[[entry]]
+id = "DX-0009"
+title = "A join that fails for reasons game.exe can't hit (a name a host won't take, a host that never finishes the join, a desync) shows d2d's own words in the OK popup"
+subsystem = "unclassified"
+original_behavior = "unknown; addition has no original counterpart documented in this row"
+port_behavior = "unknown; see source row"
+status = "documented"
+confidence = "documented"
+owner = "unassigned"
+last_verified_commit = "unknown"
+evidence = ["docs/research/re/deviations.md"]
+tests = []
+aliases = ["deviations:Additions:A join that fails for reasons game.exe can't hit (a name a host won't take, a host that never finishes the join, a desync) shows d2d's own words in the OK popup"]
+links = ["REQ-0069"]
+source_key = "deviations:Additions:A join that fails for reasons game.exe can't hit (a name a host won't take, a host that never finishes the join, a desync) shows d2d's own words in the OK popup"
+source_sha256 = "c45a058e451b3f3e6b778cf111518718a32e3307c1c2521762d2ff24bf322ef7"
+source_columns = ["What", "Why"]
+source_cells = ["A join that fails for reasons game.exe can't hit (a name a host won't take, a host that never finishes the join, a desync) shows d2d's own words in the OK popup", "Say why, instead of only logging it"]
+source_kind = "documented"

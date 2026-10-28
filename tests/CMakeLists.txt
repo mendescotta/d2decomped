@@ -62,6 +62,12 @@ target_include_directories(test_keyconfig PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d
 # Python3_EXECUTABLE rather than `python3`: Windows installs it as python.exe.
 find_package(Python3 COMPONENTS Interpreter)
 if (Python3_Interpreter_FOUND)
+    if (Python3_VERSION VERSION_GREATER_EQUAL "3.11")
+        add_test(NAME research_ledger
+                 COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/ledger.py --check)
+    else()
+        message(STATUS "Research ledger check requires Python 3.11 or newer")
+    endif()
     add_test(NAME smoke_d2d
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/smoke_d2d.py $<TARGET_FILE:d2d>)
     # Local co-op over devctl's virtual pads (docs/design/local-coop.md).

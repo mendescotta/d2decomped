@@ -5,6 +5,24 @@ C++26 engine. game.exe 1.14d is the ground truth: Ghidra and an emulator
 of its own code (tools/emu) drive the work; other projects only check our
 reading ("Reference projects" below).
 
+## Where things stand
+
+The current state is in these files, kept up to date as work lands:
+
+- [Research ledger](research/ledger/README.md): stable IDs, source coverage and
+  reported audit history; [generated inventory](research/ledger/SUMMARY.md).
+- README.md "What to expect": what plays, act by act.
+- docs/research/re/todo.md: what's left for classic, ranked.
+- docs/research/re/deviations.md: where d2d differs on purpose (and its toggles).
+- docs/research/re/bugs.md: game.exe's own bugs, and what d2d does about each.
+- docs/research/re/unverified.md and stubs.md: what isn't traced yet, and what isn't built.
+- docs/research/re/unit-sounds.md "In d2d": the sound counts.
+
+Every section below titled "Checkpoint", "Road to", "Earlier list", "Act 4
+prep", "Wilderness plan" or "Skills: where they stand" is a historical
+record: what was true, done or planned on its date. Their "still open"
+lists aren't kept up to date; check todo.md before taking one as current.
+
 ## Goals
 
 - **A drop-in replacement for game.exe.** Everything a player or a mod
