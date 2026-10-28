@@ -1078,15 +1078,19 @@ int main(int argc, char** argv) try {
             assert(!coop.fight.land(prey_index, { .hit = true }, true, now_ms));
             coop.fight.monsters[prey_index].align = align;
             // And on the player's melee blow (the strike's and Dragon
-            // Flight's kick), through damage reduction %, then flat.
-            d2d::rules::Fighter striker;
-            striker.dr_pct = 20; striker.dr_flat = 3;
+            // Flight's kick), through damage reduction %, then flat: the
+            // whole hero's, a weapon's DR too, even for a kick (pf_kick has
+            // the weapon's stats off; FUN_0057c1e0 reads the unit's).
+            const auto combat = coop.fight.actor->player_combat, kick = coop.fight.actor->pf_kick;
+            coop.fight.actor->player_combat.dr_pct = 20; coop.fight.actor->player_combat.dr_flat = 3;
+            coop.fight.actor->pf_kick.dr_pct = 0; coop.fight.actor->pf_kick.dr_flat = 0;
             const auto hurt = coop.fight.actor->self_hurt;
-            coop.fight.player_thorns(prey_index, { .hit = false }, striker);
+            coop.fight.player_thorns(prey_index, { .hit = false });
             assert(coop.fight.actor->self_hurt == hurt);
-            coop.fight.player_thorns(prey_index, { .hit = true }, striker);
+            coop.fight.player_thorns(prey_index, { .hit = true });
             assert(coop.fight.actor->self_hurt == hurt + (std::int64_t(40 * 80 / 100 - 3) << 8));
             coop.fight.actor->self_hurt = hurt;
+            coop.fight.actor->player_combat = combat; coop.fight.actor->pf_kick = kick;
             coop.fight.monsters[prey_index].props.thorns = 0;
         }
         coop.fight.monsters[prey_index].hit_points = 0;

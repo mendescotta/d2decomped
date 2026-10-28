@@ -990,7 +990,7 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         const int hp_before = target_monster.hit_points;
         const auto target = std::size_t(actor->attack_mon);
         const auto blow = d2d::rules::player_blow(fighter, target_of(target), int(actor->character.stats.get(d2d::d2s::kLevel)), rng, current_swing);
-        if (land(target, blow, true, now_ms)) player_thorns(target, blow, fighter);
+        if (land(target, blow, true, now_ms)) player_thorns(target, blow);
         if (blow.hit && charging) charge(*skill, now_ms);
         if (blow.hit && finishing) release(target, now_ms);
         if (blow.hit && skill && skill->srvdofunc == ServerDoFunction::kDragonTail) dragon_tail(*skill, target, blow.phys, now_ms);
@@ -1173,7 +1173,7 @@ auto Fight::spot(const d2d::rules::Skill& skill, std::uint32_t now_ms, const Cas
                 if (skill.srvdofunc == ServerDoFunction::kDragonFlight) {             // the kick, then its charges released, hit or not (FUN_005d5220)
                     const auto kick = d2d::rules::player_blow(actor->pf_kick, target_of(std::size_t(tgt)), int(actor->character.stats.get(d2d::d2s::kLevel)), rng,
                                                               skill_swing(skill, lvl, env, true));
-                    if (land(std::size_t(tgt), kick, true, now_ms)) player_thorns(std::size_t(tgt), kick, actor->pf_kick);   // a melee blow like any kick
+                    if (land(std::size_t(tgt), kick, true, now_ms)) player_thorns(std::size_t(tgt), kick);   // a melee blow like any kick
                     release(std::size_t(tgt), now_ms);
                 }
                 break;
@@ -1852,10 +1852,13 @@ auto Fight::merc_strike(std::size_t target, const d2d::rules::Swing& swing, std:
 // A MonProp thorns monster (stat 78, damagedinmelee func 6, FUN_005bf670):
 // its flat value back on the player's melee blow as physical damage, through
 // the striker's damage reduction (FUN_0057c6c0 -> FUN_0057c1e0, as a
-// monster's blow). The main strike and Dragon Flight's kick.
-auto Fight::player_thorns(std::size_t target, const d2d::rules::Blow& blow, const d2d::rules::Fighter& fighter) -> void {
+// monster's blow). The main strike and Dragon Flight's kick. FUN_0057c1e0
+// reads the unit's full stats, so a kick's thorns go through the weapon's
+// damage reduction too: player_combat, not pf_kick.
+auto Fight::player_thorns(std::size_t target, const d2d::rules::Blow& blow) -> void {
+        const auto& hero = actor->player_combat;
         if (const int thorns = monsters[target].props.thorns; blow.hit && thorns > 0)
-            actor->self_hurt += std::int64_t(std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0)) << 8;
+            actor->self_hurt += std::int64_t(std::max(thorns * (100 - hero.dr_pct) / 100 - hero.dr_flat, 0)) << 8;
 }
 
 auto Fight::pet_strike(Pet& pet, std::size_t target, const d2d::rules::Blow& blow, std::uint32_t now_ms) -> void {
