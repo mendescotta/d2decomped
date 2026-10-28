@@ -9,6 +9,9 @@
 Without COUNT it stops at the `ret` that ends the function: one followed by
 0xCC padding or the next function's `push ebp; mov ebp, esp`. A `ret` inside
 it (an early return, a switch arm) doesn't stop it.
+It can run on into the next function when that one has neither: a function
+without a frame pointer placed right after a `ret` with no padding
+(`disasm.py 40a420` reads on past `0040a43f ret`). Pass COUNT there.
 
 A line is `address  mnemonic operands`, so `--all`'s file greps for an
 immediate (a string's address, a table's) or an instruction shape. It's a

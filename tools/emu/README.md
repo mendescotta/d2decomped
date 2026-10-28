@@ -170,7 +170,8 @@ game.exe as `emu.py` does (`--exe PATH` for another).
 
 - `disasm.py 623f50 [COUNT]`: a function from its address to its end,
   the `ret` followed by 0xCC padding or the next `push ebp; mov ebp, esp`,
-  so an early return doesn't stop it (or COUNT instructions). `disasm.py --all out.txt` writes every
+  so an early return doesn't stop it (or COUNT instructions). It can run on into an
+  unpadded next function with no frame pointer (`40a420`): pass COUNT there. `disasm.py --all out.txt` writes every
   executable section, a line an instruction, to grep for an immediate
   (a string's or a table's address) or an instruction shape.
 - `scan_writes.py OFFSET [SIZE] [LO-HI]`: the .text instructions with a
