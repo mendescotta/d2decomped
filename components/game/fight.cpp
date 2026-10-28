@@ -336,7 +336,7 @@ auto Fight::monster_sounds(Monster& monster, std::uint32_t now_ms) -> void {
             if (sounds) {
                 if (monster.mode == "A1" || monster.mode == "A2") {
                     const std::size_t attack_index = monster.mode == "A2";
-                    if (rng(100) < sounds->att_prb[attack_index]) play(sounds->attack[attack_index], now_ms + std::uint32_t(sounds->att_del[attack_index]) * 40);
+                    if (int(sound_rng(100)) < sounds->att_prb[attack_index]) play(sounds->attack[attack_index], now_ms + std::uint32_t(sounds->att_del[attack_index]) * 40);
                     play(sounds->weapon[attack_index], now_ms + std::uint32_t(sounds->wea_del[attack_index]) * 40);
                 } else if (monster.mode == "GH" || monster.mode == "KB" || monster.mode == "DT") {
                     namespace snd = d2d::rules::sound_ids;
