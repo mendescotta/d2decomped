@@ -839,11 +839,17 @@ auto Town::net_overlay() -> void {
             else if (!commanded.empty() && commanded != "WL" && commanded != "NU" && since < 600) monster.mode = commanded;
             else monster.mode = unit.moving ? "WL" : "NU";
             if (monster.mode != monster.last_mode) monster.unit.mode_ms = world_ms;   // the animation starts over
-            monster.last_mode = monster.mode;
             monster.hit_points = unit.life == 0 ? 0 : std::max(1, monster.stats.hit_points * unit.life / 128);
             monster.host_states = host_states(unit.states);
+            // The host sends no MonSounds: game.exe's client plays them itself, from the unit's
+            // mode (FUN_004cc410, FUN_004cb890), its first showing (FUN_004cc380), Neutral
+            // (FUN_004cb460) and footsteps (FUN_004caf60). The same path as single player's,
+            // which moves last_mode on.
+            world.fight.monster_sounds(monster, world_ms);
             view.monsters.push_back(monster);
         }
+        std::ranges::move(world.cues.due, std::back_inserter(cues.due));
+        world.cues.due.clear();
         // The host's ground items, named as d2d names its own (labels kept by id).
         view.ground.clear();
         for (const auto& [id, lying] : net_game->ground) {

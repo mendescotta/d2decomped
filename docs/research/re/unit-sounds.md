@@ -365,7 +365,12 @@ TravelSound cued with it as owner, stopped by the client when it's gone from
 the View (`Audio::stop_owners`). States: `StateClock` in `dress()`. Footsteps:
 `World::footstep_frame`, `Fight::monster_sounds`. Objects: the client's
 `Town::object_sounds`. Greetings: `World::greet_sound`. Sound rolls use
-`Fight::sound_rng`, apart from the game's.
+`Fight::sound_rng`, apart from the game's. In a joined game the host sends no
+MonSounds (game.exe's client makes them from the unit's mode), so
+`Town::net_overlay` runs each host monster through `Fight::monster_sounds`
+too: its mode from the host's unit command, its Init, Neutral and footsteps.
+The host's hit class isn't read, so a joined game's monsters play no impact
+on GH / KB / DT.
 Left: the player's quest lines, monsters' own skill stsound,
 prgsound, ProgSound, block (FUN_004cb860) and kick sounds, state 0x92, a
 missile's hit class on a player, the town's floor material (its DS1 tiles
