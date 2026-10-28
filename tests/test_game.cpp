@@ -1090,6 +1090,27 @@ int main(int argc, char** argv) try {
             coop.fight.player_thorns(prey_index, { .hit = true });
             assert(coop.fight.actor->self_hurt == hurt + (std::int64_t(40 * 80 / 100 - 3) << 8));
             coop.fight.actor->self_hurt = hurt;
+            // Dragon Flight through Fight::spot: beside the prey, the kick, and on
+            // a landed kick the thorns through the whole hero's DR. The kick rolls
+            // to hit, so a few casts: each one's thorns are none or exactly these.
+            const auto* flight = data->skills.get(data->skills.by_name.at("Dragon Flight"));
+            assert(flight && flight->srvdofunc == d2d::rules::ServerDoFunction::kDragonFlight);
+            const auto at_x = coop.fight.actor->player.x, at_y = coop.fight.actor->player.y;
+            int landed = 0;
+            for (int cast = 0; cast < 40; ++cast) {
+                auto& prey_now = coop.fight.monsters[prey_index];
+                prey_now.hit_points = prey_now.stats.hit_points * 100;
+                std::tie(coop.fight.actor->player.x, coop.fight.actor->player.y) = blood_moor->nearest_free(prey_now.unit.x + 2, prey_now.unit.y);
+                coop.fight.actor->attack_mon = int(prey_index);
+                const auto before = coop.fight.actor->self_hurt;
+                coop.fight.spot(*flight, now_ms, { .level = 1, .target = int(prey_index) });
+                const auto taken = coop.fight.actor->self_hurt - before;
+                assert(taken == 0 || taken == (std::int64_t(40 * 80 / 100 - 3) << 8));
+                landed += taken != 0;
+            }
+            assert(landed > 0);
+            coop.fight.actor->self_hurt = hurt;
+            coop.fight.actor->player.x = at_x; coop.fight.actor->player.y = at_y;
             coop.fight.actor->player_combat = combat; coop.fight.actor->pf_kick = kick;
             coop.fight.monsters[prey_index].props.thorns = 0;
         }
