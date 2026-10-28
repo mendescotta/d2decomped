@@ -883,6 +883,24 @@ int main(int argc, char** argv) try {
         const auto full = second.character.stats.get(d2d::d2s::kMaxLife);   // `prey` may move as monsters are born: by id from here
         for (int frame = 0; frame < 250 && second.character.stats.get(d2d::d2s::kLife) >= full; ++frame, now_ms += kTickMs) coop.tick({}, now_ms + kTickMs, now_ms);
         assert(second.character.stats.get(d2d::d2s::kLife) < full);
+        {   // As it first shows (FUN_004cc380) a live monster plays its Init; a
+            // corpse (a joined game's monster already dead) plays none.
+            const auto with_init = std::ranges::find_if(data->monsters.types, [&](const auto& type) {
+                const auto found = data->mon_sounds.find(d2d::rules::boss_sound(type, d2d::rules::Boss::none, {}));
+                return found != data->mon_sounds.end() && found->second.init > 0; });
+            assert(with_init != data->monsters.types.end());
+            const int init = data->mon_sounds.at(d2d::rules::boss_sound(*with_init, d2d::rules::Boss::none, {})).init;
+            const auto shows = [&](int hit_points) {
+                Monster shown;
+                shown.type = int(with_init - data->monsters.types.begin());
+                shown.hit_points = hit_points;
+                coop.cues.due.clear();
+                coop.fight.monster_sounds(shown, now_ms);
+                return std::ranges::count(coop.cues.due, init, &Cues::Cue::sound);
+            };
+            assert(shows(1) == 1 && shows(0) == 0);
+            coop.cues.due.clear();
+        }
 
         // Player-count rules (net-host.md section 2). Life and experience +50 %
         // a player past the first (FUN_00573cb0, tables 0x6e1590 / 0x6e15b4).

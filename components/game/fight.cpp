@@ -307,7 +307,9 @@ auto Fight::monster_sounds(Monster& monster, std::uint32_t now_ms) -> void {
             for (int row = 0; row < monster.seq_sounds; ++row) play(monster.seq_sound, now_ms);
         monster.seq_sounds = 0;
         // As it first shows (FUN_004cc380): its Init, outside town, a Neutral's start.
-        if (!monster.sounded) {
+        // A corpse (a joined game's monster already dead as it comes) waits:
+        // FUN_004cc380 itself only gates on the +0x80 timer, its caller untraced.
+        if (!monster.sounded && monster.alive()) {
             monster.sounded = true;
             if (sounds && sounds->init > 0 && !town) {
                 play(sounds->init, now_ms);
