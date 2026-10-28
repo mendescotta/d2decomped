@@ -853,6 +853,13 @@ int main(int argc, char** argv) try {
         assert(attacker.attack_mon == index);
         attacker.attack_mon = -1;
         world.fight.monsters.pop_back();
+        // A town NPC is align 2 as well (MonStats Align 1) but interact: it stays clickable.
+        const auto akara = std::ranges::find(data->monsters.types, std::string_view("akara"), &decltype(data->monsters.types)::value_type::id);
+        assert(akara != data->monsters.types.end() && akara->interact);
+        turned.type = int(akara - data->monsters.types.begin());
+        assert(turned.ally_not_interact(*data) == false);
+        turned.type = -1;
+        assert(turned.ally_not_interact(*data));
         std::printf("OK: a converted monster isn't attacked\n");
     }
 

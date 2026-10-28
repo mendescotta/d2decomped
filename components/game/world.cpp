@@ -2576,9 +2576,10 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
         const auto& use_skill = std::get<cmd::UseSkill>(command);
         const auto* skill = game_data->skills.get(use_skill.skill);
         const int monster_index = fight.monster_index(use_skill.unit);
-        // A converted monster (align 2) is the player's side: game.exe's cursor never picks it
-        // (HitTestScreen drops what CanInteractWith refuses, an ally by IsAllyOf), so no attack.
-        const bool live = monster_index >= 0 && fight.monsters[std::size_t(monster_index)].targetable() && fight.monsters[std::size_t(monster_index)].align != 2;
+        // A converted monster is the player's side: game.exe's cursor never picks it (HitTestScreen
+        // drops what CanInteractWith refuses, an ally by IsAllyOf), so no attack.
+        const auto* target = monster_index >= 0 ? &fight.monsters[std::size_t(monster_index)] : nullptr;
+        const bool live = target && target->targetable() && !target->ally_not_interact(*game_data);
         if (skill && !skill->in_town && !in_moor) {
             if (fight.sound_rng(2)) class_cue("not_in_town_1", now_ms);
             else class_cue("not_in_town_2", now_ms);
