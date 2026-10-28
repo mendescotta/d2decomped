@@ -4351,7 +4351,9 @@ auto Fight::in_reach() const -> std::vector<int> {
 auto Fight::engage(std::uint32_t now_ms) -> std::optional<std::pair<float, float>> {
         if (actor->attack_mon < 0 || actor->pmode >= 0) return std::nullopt;
         const auto& target = monsters[std::size_t(actor->attack_mon)];
-        if (!target.alive()) { actor->attack_mon = -1; return std::nullopt; }
+        // Dead, or turned to the player's side while the button was held (Conversion): dropped, as
+        // World::apply turns a fresh command on it away.
+        if (!target.alive() || target.ally_not_interact(*game_data)) { actor->attack_mon = -1; return std::nullopt; }
         const auto* skill = game_data->skills.get(actor->attack_skill);
         if (skill && (missile_skill(*skill) || spot_skill(*skill))) {   // from here, at it
             cast_missile(actor->attack_skill, target.unit.x, target.unit.y, now_ms);

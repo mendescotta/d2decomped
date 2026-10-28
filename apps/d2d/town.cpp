@@ -843,6 +843,7 @@ auto Town::net_overlay() -> void {
             if (monster.mode != monster.last_mode) monster.unit.mode_ms = world_ms;   // the animation starts over
             monster.hit_points = unit.life == 0 ? 0 : std::max(1, monster.stats.hit_points * unit.life / 128);
             monster.host_states = host_states(unit.states);
+            monster.align = std::ranges::contains(monster.host_states, std::string_view("conversion")) ? 2 : 0;   // the host converted it: no target, as Fight::monster_states
             // The host sends no MonSounds: game.exe's client plays them itself, from the unit's
             // mode (FUN_004cc410, FUN_004cb890), its first showing (FUN_004cc380), Neutral
             // (FUN_004cb460) and footsteps (FUN_004caf60). The same path as single player's,
@@ -1999,7 +2000,7 @@ auto Town::pad_pick(const PadPlayer& player_pad, const UnitState& unit, bool use
         const float hero_x = unit.x, hero_y = unit.y, face_x = player_pad.face_x, face_y = player_pad.face_y;
         std::vector<pad::Candidate> monsters;
         for (const auto& monster : view.monsters)
-            if (monster.alive()) monsters.push_back({ monster.id, monster.unit.x, monster.unit.y });
+            if (monster.alive() && !monster.ally_not_interact(*scene)) monsters.push_back({ monster.id, monster.unit.x, monster.unit.y });   // not a converted one, as the cursor
         if (const int hit = pad::pick_target(hero_x, hero_y, face_x, face_y, monsters, player_pad.target, aim); hit >= 0)
             return { PadPick::kMonster, monsters[std::size_t(hit)].id, monsters[std::size_t(hit)].x, monsters[std::size_t(hit)].y };
         if (!uses) return {};

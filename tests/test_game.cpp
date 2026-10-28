@@ -836,9 +836,17 @@ int main(int argc, char** argv) try {
         // interact with (HitTestScreen: CanInteractWith is !IsAllyOf), so an attack names it only
         // through devctl or the net; World turns that away too and the hero stays put.
         auto& attacker = *world.actor;
+        using MonType = decltype(data->monsters.types)::value_type;
+        const auto zombie = std::ranges::find(data->monsters.types, std::string_view("zombie1"), &MonType::id);
+        assert(zombie != data->monsters.types.end() && !zombie->interact);
+        // Conversion's own state on it: each tick's Fight::monster_states makes it align 2 from that.
+        const int conversion = data->skills.by_name.at("Conversion");
+        const Monster::SkillState converted{ conversion, 1, 0xffffffffu };
         Monster turned;
+        turned.type = int(zombie - data->monsters.types.begin());   // a real one: a tick reads its MonStats row
         turned.id = 0x7ffff0;
         turned.hit_points = 100;
+        turned.cry = converted;
         turned.align = 2;
         turned.unit.x = attacker.player.x + 2;
         turned.unit.y = attacker.player.y;
@@ -847,19 +855,35 @@ int main(int argc, char** argv) try {
         attacker.attack_mon = -1;
         const std::vector<Order> attack{ { attacker.id, cmd::UseSkill{ 0, turned.unit.x, turned.unit.y, turned.id, true } } };
         world.tick(attack, (4502 + 1) * kTickMs, 4502 * kTickMs);
-        assert(attacker.attack_mon == -1);
-        world.fight.monsters[std::size_t(index)].align = 0;   // the same monster, hostile: attacked
+        assert(attacker.attack_mon == -1 && world.fight.monsters[std::size_t(index)].align == 2);
+        {   // the client's View carries its side: no hover name, no pad pick there either
+            View shown = world.view();
+            shown.monsters = { world.fight.monsters[std::size_t(index)] };
+            ViewEncoder encoder;
+            View received;
+            assert(apply_view(*data, encode_view(*data, shown, encoder), received));
+            assert(received.monsters.size() == 1 && received.monsters[0].align == 2 && received.monsters[0].ally_not_interact(*data));
+        }
+        world.fight.monsters[std::size_t(index)].cry = {};    // the same monster, hostile: attacked
+        world.fight.monsters[std::size_t(index)].align = 0;
         world.tick(attack, (4502 + 2) * kTickMs, (4502 + 1) * kTickMs);
-        assert(attacker.attack_mon == index);
-        attacker.attack_mon = -1;
+        assert(attacker.attack_mon == index && attacker.pmode < 0);   // still walking up to it
+        // Converted while the button is held: the walk-up drops it, no swing.
+        world.fight.monsters[std::size_t(index)].cry = converted;   // as Conversion's hit sets both
+        world.fight.monsters[std::size_t(index)].align = 2;
+        world.tick({}, (4502 + 3) * kTickMs, (4502 + 2) * kTickMs);
+        assert(attacker.attack_mon == -1 && attacker.pmode < 0);
         world.fight.monsters.pop_back();
         // A town NPC is align 2 as well (MonStats Align 1) but interact: it stays clickable.
-        const auto akara = std::ranges::find(data->monsters.types, std::string_view("akara"), &decltype(data->monsters.types)::value_type::id);
+        const auto akara = std::ranges::find(data->monsters.types, std::string_view("akara"), &MonType::id);
         assert(akara != data->monsters.types.end() && akara->interact);
         turned.type = int(akara - data->monsters.types.begin());
         assert(turned.ally_not_interact(*data) == false);
-        turned.type = -1;
+        turned.type = -1;                                      // no MonStats row: no interact either
         assert(turned.ally_not_interact(*data));
+        // A joined game's host converts with its state (town.cpp net_overlay): Conversion's aura target.
+        const auto* conversion_row = data->skills.get(conversion);
+        assert(conversion_row && conversion_row->auratarget == "conversion" && std::ranges::contains(data->state_names, std::string("conversion")));
         std::printf("OK: a converted monster isn't attacked\n");
     }
 
