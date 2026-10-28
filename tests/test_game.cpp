@@ -1071,6 +1071,12 @@ int main(int argc, char** argv) try {
             assert(pet.monster.hit_points == life);
             coop.fight.pet_strike(pet, prey_index, { .hit = true }, now_ms);
             assert(pet.monster.hit_points == life - d2d::rules::resisted(40, resist));
+            // None from a converted monster: no blow lands on it (FUN_00554200).
+            const int align = std::exchange(coop.fight.monsters[prey_index].align, 2);
+            coop.fight.pet_strike(pet, prey_index, { .hit = true }, now_ms);
+            assert(pet.monster.hit_points == life - d2d::rules::resisted(40, resist));
+            assert(!coop.fight.land(prey_index, { .hit = true }, true, now_ms));
+            coop.fight.monsters[prey_index].align = align;
             // And on the player's melee blow (the strike's and Dragon
             // Flight's kick), through damage reduction %, then flat.
             d2d::rules::Fighter striker;

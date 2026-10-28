@@ -57,7 +57,9 @@ monster-ai.md.
     v)). Thorns (78, damagedinmelee func 6, `FUN_005bf670`) puts its flat
     value on a melee striker (unit +0xc4 bit 2) as physical damage through
     `FUN_0057c6c0` → `FUN_0057c1e0`, so its damage reduction applies: the
-    player's swings and the merc's (`Fight::merc_strike`). Knockback (81,
+    player's swings and the merc's (`Fight::merc_strike`), only off a blow
+    that landed (`Fight::land`: none on a block, a miss, or a converted
+    monster, which takes no blow, `FUN_00554200`). Knockback (81,
     func 7, `FUN_005bf960`) is a seed draw's low 7 bits under a bound,
     result flag 8: 0x40 against a player or a plain monster, 0x20 for a
     MonStats2 `large` one, 0x80 (always) a `small` one (byte +5 & 8 / & 4,

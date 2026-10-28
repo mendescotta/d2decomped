@@ -837,13 +837,13 @@ auto Fight::skill_swing(const d2d::rules::Skill& skill_row, int lvl, const d2d::
         return swing;
     }
 
-auto Fight::land(std::size_t monster_index, const d2d::rules::Blow& blow, bool by_player, std::uint32_t now_ms) -> void {
+auto Fight::land(std::size_t monster_index, const d2d::rules::Blow& blow, bool by_player, std::uint32_t now_ms) -> bool {
         using namespace d2d::d2s;
         auto& target = monsters[monster_index];
-        if (!target.targetable()) return;                       // under the sand, aloft: nothing reaches it
-        if (target.align == 2) return;                          // converted: no foe of the player's side (FUN_00554200)
-        if (blow.blocked) { block_anim(*game_data, target, now_ms); return; }
-        if (!blow.hit) return;
+        if (!target.targetable()) return false;                     // under the sand, aloft: nothing reaches it
+        if (target.align == 2) return false;                        // converted: no foe of the player's side (FUN_00554200)
+        if (blow.blocked) { block_anim(*game_data, target, now_ms); return false; }
+        if (!blow.hit) return false;
         target.hit_class = blow.hit_class;
         if (by_player) {
             auto& life = actor->character.stats.values[kLife];
@@ -892,7 +892,7 @@ auto Fight::land(std::size_t monster_index, const d2d::rules::Blow& blow, bool b
             actor->character.stats.values[kLife] = std::min(actor->character.stats.values[kMaxLife], actor->character.stats.values[kLife]
                                          + ((std::int64_t(blow.damage) * calc(*curse, curse->calc[0], target.curse.level) / 100) << 8));
         const int taken = soak(target, d2d::rules::resisted(blow.phys, target_of(monster_index).res[0]), blow.damage);
-        if (hurt(*game_data, target, taken, now_ms)) { killed(monster_index, now_ms); return; }
+        if (hurt(*game_data, target, taken, now_ms)) { killed(monster_index, now_ms); return true; }
         // Knockback (result flag 8): a monster with GH and KB modes
         // (MonStats2, FUN_0046c140 bits 3 / 13; else it's a GH) goes into
         // KB (FUN_005a77d0): path type 8, 5 subtiles on from the attacker,
@@ -903,6 +903,7 @@ auto Fight::land(std::size_t monster_index, const d2d::rules::Blow& blow, bool b
         // ponytail: an even slide over KB's length; the path's own pace
         // (FUN_00554ca0) isn't traced.
         if (blow.knockback) knock_back(target, actor->player.x, actor->player.y, now_ms);
+        return true;
     }
 
 auto Fight::knock_back(Monster& target, float from_x, float from_y, std::uint32_t now_ms) -> void {
@@ -989,8 +990,7 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         const int hp_before = target_monster.hit_points;
         const auto target = std::size_t(actor->attack_mon);
         const auto blow = d2d::rules::player_blow(fighter, target_of(target), int(actor->character.stats.get(d2d::d2s::kLevel)), rng, current_swing);
-        land(target, blow, true, now_ms);
-        player_thorns(target, blow, fighter);
+        if (land(target, blow, true, now_ms)) player_thorns(target, blow, fighter);
         if (blow.hit && charging) charge(*skill, now_ms);
         if (blow.hit && finishing) release(target, now_ms);
         if (blow.hit && skill && skill->srvdofunc == ServerDoFunction::kDragonTail) dragon_tail(*skill, target, blow.phys, now_ms);
@@ -1173,8 +1173,7 @@ auto Fight::spot(const d2d::rules::Skill& skill, std::uint32_t now_ms, const Cas
                 if (skill.srvdofunc == ServerDoFunction::kDragonFlight) {             // the kick, then its charges released, hit or not (FUN_005d5220)
                     const auto kick = d2d::rules::player_blow(actor->pf_kick, target_of(std::size_t(tgt)), int(actor->character.stats.get(d2d::d2s::kLevel)), rng,
                                                               skill_swing(skill, lvl, env, true));
-                    land(std::size_t(tgt), kick, true, now_ms);
-                    player_thorns(std::size_t(tgt), kick, actor->pf_kick);   // a melee blow like any kick
+                    if (land(std::size_t(tgt), kick, true, now_ms)) player_thorns(std::size_t(tgt), kick, actor->pf_kick);   // a melee blow like any kick
                     release(std::size_t(tgt), now_ms);
                 }
                 break;
@@ -1844,10 +1843,10 @@ auto Fight::merc_strike(std::size_t target, const d2d::rules::Swing& swing, std:
         const auto fighter = merc_fighter();
         const int thorns = monsters[target].props.thorns;
         const auto blow = d2d::rules::player_blow(fighter, target_of(target), actor->merc_st.level, rng, swing);
-        land(target, blow, false, now_ms);
+        const bool landed = land(target, blow, false, now_ms);
         // A MonProp thorns monster's flat value back on the merc, a melee
         // striker as the player is (FUN_005bf670), through its damage reduction.
-        if (blow.hit && thorns > 0) actor->merc_hurt += std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0);
+        if (landed && thorns > 0) actor->merc_hurt += std::max(thorns * (100 - fighter.dr_pct) / 100 - fighter.dr_flat, 0);
     }
 
 // A MonProp thorns monster (stat 78, damagedinmelee func 6, FUN_005bf670):
@@ -1861,10 +1860,10 @@ auto Fight::player_thorns(std::size_t target, const d2d::rules::Blow& blow, cons
 
 auto Fight::pet_strike(Pet& pet, std::size_t target, const d2d::rules::Blow& blow, std::uint32_t now_ms) -> void {
         const int thorns = monsters[target].props.thorns;
-        land(target, blow, false, now_ms);
+        const bool landed = land(target, blow, false, now_ms);
         // A MonProp thorns monster's flat value back on the pet (FUN_005bf670),
         // a monster striker: through its own damage resist, as a monster's hit on a monster.
-        if (blow.hit && thorns > 0) pet_hurt(pet, d2d::rules::resisted(thorns, pet.monster.target(*game_data).res[0]), now_ms);
+        if (landed && thorns > 0) pet_hurt(pet, d2d::rules::resisted(thorns, pet.monster.target(*game_data).res[0]), now_ms);
     }
 
 auto Fight::merc_fighter() const -> d2d::rules::Fighter {
