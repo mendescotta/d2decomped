@@ -433,6 +433,7 @@ auto Town::enter() -> void {
         lead_colour = 0;
         focus = 0;
         skillbar.new_game();
+        hand_items.clear();
         publish();
         if (scene && level) load_automap(automap, automap_dir(world), character.name, scene->map_seed, level->layer);
     }
@@ -497,7 +498,7 @@ auto Town::send(const Command& command) -> void {
                     else world.display_swing(use->skill, monster.unit.x, monster.unit.y, world_ms);
                     return;
                 }
-                net.send(cmd::UseSkill{ use->skill, monster.unit.x, monster.unit.y, -1, use->left });   // the missile flies at it here, for show
+                net.send(cmd::UseSkill{ use->skill, monster.unit.x, monster.unit.y, -1, use->left, use->item });   // the missile flies at it here, for show
                 return;
             }
             net_attack = -1;
@@ -1117,6 +1118,7 @@ auto Town::automap_frame() -> void {
 auto Town::new_game() -> void {
         world.new_game();
         skillbar.new_game();
+        hand_items.clear();
     }
 
 auto Town::open_game_menu() -> void {
@@ -2099,13 +2101,15 @@ auto Town::lead_leaves() -> int {
         const auto next = std::ranges::find(coop, world.players[1]->id, &CoopPlayer::id);
         if (next == coop.end()) return -1;
         take_focus(hero.id);
+        hand_items.erase(hero.id);
         if (scene && level) save_automap(automap, automap_dir(world), character.name, scene->map_seed, level->layer);
         if (const auto why = world.leave(hero.id); !why.empty()) d2d::log::warn("{}", why);
         // The next player's character is the screen's now (`hero` is slot [0], theirs).
         static_cast<Character&>(character) = hero.character;
         character.hardcore = hero.character.header.hardcore();
         character.selected = kSaveClassToUi[std::clamp(int(hero.character.header.cls), 0, 6)];
-        skillbar.left = int(hero.character.header.left_skill); skillbar.right = int(hero.character.header.right_skill); skillbar.left_item = skillbar.right_item = -1;
+        skillbar.left = int(hero.character.header.left_skill); skillbar.right = int(hero.character.header.right_skill);
+        load_hands(hero.id);
         skillbar_set = int(hero.character.header.weapon_set);
         const int seat = next->seat;
         lead_colour = next->colour;
@@ -2260,7 +2264,15 @@ auto Town::field_play(PadPlayer& player_pad, pad::Mapper& mapper, const World::P
         const bool dead = hero_there.pmode == game::kModeDT || hero_there.pmode == game::kModeDD;
         const bool field = !game_menu.open;
         pad_walk(player_pad, hero_there.player, dead && !hero_there.ghost, field, out);   // a ghost walks
-        pad_act(player_pad, hero_there.player, dead, field, int(hero_there.character.header.left_skill), int(hero_there.character.header.right_skill), out);
+        // Its hands' charged entries (kept while another player has the
+        // screen); one gone since is Attack / 0, as the skillbar's drop_gone.
+        auto& held = hand_items[hero_there.id];
+        int left_skill = int(hero_there.character.header.left_skill), right_skill = int(hero_there.character.header.right_skill);
+        const auto entries = d2d::game::charged_skills(hero_there.character.items);
+        const auto gone = [&](int skill, int item) { return item >= 0 && std::ranges::none_of(entries, [&](const d2d::game::ChargedSkill& had) { return had.item == item && had.skill == skill; }); };
+        if (gone(left_skill, held.left)) { left_skill = 0; held.left = -1; }
+        if (gone(right_skill, held.right)) { right_skill = 0; held.right = -1; }
+        pad_act(player_pad, hero_there.player, dead, field, left_skill, right_skill, out, held.left, held.right);
         return opens;
     }
 
@@ -2290,8 +2302,14 @@ auto Town::focus_colour() const -> int {
         return found == coop.end() ? lead_colour : found->colour;
     }
 
+auto Town::load_hands(int id) -> void {
+        const auto kept = hand_items.contains(id) ? hand_items.at(id) : HandItems{};
+        skillbar.left_item = kept.left; skillbar.right_item = kept.right; skillbar.hotkey_items = kept.hotkeys;
+    }
+
 auto Town::take_focus(int id) -> void {
         if (id == focus_id()) return;
+        hand_items[focus_id()] = { skillbar.left_item, skillbar.right_item, skillbar.hotkey_items };   // the last owner's charged entries, kept
         // Whatever the last owner had open shuts (it's theirs, not the next one's).
         inv_open = char_open = stash_open = cube_open = tree_open = belt_open = false;
         quest_log.open = false; automap.open = false; skillbar.picking = 0;
@@ -2301,7 +2319,8 @@ auto Town::take_focus(int id) -> void {
         static_cast<Character&>(character) = owner.character;
         character.hardcore = owner.character.header.hardcore();
         character.selected = kSaveClassToUi[std::clamp(int(owner.character.header.cls), 0, 6)];
-        skillbar.left = int(owner.character.header.left_skill); skillbar.right = int(owner.character.header.right_skill); skillbar.left_item = skillbar.right_item = -1;
+        skillbar.left = int(owner.character.header.left_skill); skillbar.right = int(owner.character.header.right_skill);
+        load_hands(id);
         skillbar_set = int(owner.character.header.weapon_set);
         quest_log.sent_known = false;
         pad = {};

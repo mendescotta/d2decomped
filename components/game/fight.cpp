@@ -150,7 +150,7 @@ auto Fight::new_game(int difficulty) -> void {
         actor->stamina_pot = {};
         actor->pets.clear();
         actor->attack_mon = -1;
-        actor->charge = {};                                   // no cast from a charged entry carried in
+        actor->item_charge = actor->attack_charge = {};            // no cast from a charged entry carried in
         actor->pmode = -1;
         actor->struck_class = actor->shown_class = 0;   // a new game's unit: no hit class yet
     }
@@ -462,7 +462,7 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             const int speed = attack_mode(mode) ? d2d::rules::attack_speed(rate, actor->player_combat.ias, actor->player_combat.wsm, chill_rate(now_ms)) : rate;
             const int swing_ticks = (swing.frames * 256 + 128) / speed;
             const std::uint32_t start_at = now_ms + (skill->st_sound_delay ? std::uint32_t(std::max(swing_ticks - 3, 0)) * 40 : 0);
-            const bool item = (actor->item_cast || charged(skill->id)) && skill->item_cast_sound > 0;   // a scroll, or a charged entry (its owner's guid, FUN_004c6140)
+            const bool item = (actor->item_cast || from_charges(skill->id)) && skill->item_cast_sound > 0;   // a scroll, or a charged entry (its owner's guid, FUN_004c6140)
             cues.cue_on(unit_key(kSoundOnPlayer, actor->id), item ? skill->item_cast_sound : skill->st_sound, start_at, actor->player.x, actor->player.y);
             if (skill->weapon_sound) cues.cue_on(unit_key(kSoundOnPlayer, actor->id), swing.sound, now_ms + std::uint32_t(swing_ticks) * 40, actor->player.x, actor->player.y);
             const int cls = actor->character.character_class;
@@ -663,6 +663,7 @@ auto Fight::start_swing(std::uint32_t now_ms) -> bool {
         using namespace d2d::d2s;
         actor->swing_skill = 0;
         actor->kicks_left = 0;
+        actor->item_charge = actor->attack_charge;            // the queued attack's entry (World::apply), if any
         const auto* skill = game_data->skills.get(actor->attack_skill);
         if (skill && actor->attack_skill != 0) {
             if (!skill_built(*skill)) {
@@ -672,7 +673,7 @@ auto Fight::start_swing(std::uint32_t now_ms) -> bool {
                                    skill->name, int(skill->srvstfunc), int(skill->srvdofunc));
                 }
             } else {
-                const int lvl = skill_level ? skill_level(actor->attack_skill) : 0;
+                const int lvl = cast_level(actor->attack_skill);
                 const int cost = cost_of(*skill, lvl);
                 if (lvl > 0 && actor->character.stats.values[kMana] >= cost) {
                     pay(*skill, cost);
@@ -2570,7 +2571,7 @@ auto Fight::cast_missile(int skill, float target_x, float target_y, std::uint32_
         using namespace d2d::d2s;
         const auto* skill_row = game_data->skills.get(skill);
         if (!skill_row || dead() || actor->pmode >= 0 || (!missile_skill(*skill_row) && !spot_skill(*skill_row))) return false;
-        const int lvl = skill_level ? skill_level(skill) : 0;
+        const int lvl = cast_level(skill);
         const int cost = cost_of(*skill_row, lvl);
         if (lvl > 0 && actor->character.stats.values[kMana] < cost) need_mana(now_ms);
         if (lvl <= 0 || actor->character.stats.values[kMana] < cost || (needs_ammo(*skill_row) && ammo_index() < 0)) { actor->attack_mon = -1; return false; }
@@ -3180,7 +3181,7 @@ auto Fight::cast_summon(int skill, float target_x, float target_y, std::uint32_t
         const auto* skill_row = game_data->skills.get(skill);
         if (!skill_row || dead() || actor->pmode >= 0 || !summon_skill(*skill_row)) return false;
         if (skill_row->target_corpse && corpse_near(target_x, target_y) < 0) return false;
-        const int lvl = skill_level ? skill_level(skill) : 0;
+        const int lvl = cast_level(skill);
         const int cost = cost_of(*skill_row, lvl);
         if (lvl > 0 && actor->character.stats.values[kMana] < cost) need_mana(now_ms);
         if (lvl <= 0 || actor->character.stats.values[kMana] < cost) return false;
@@ -4320,10 +4321,19 @@ auto Fight::cast_scroll(int skill, std::uint32_t now_ms) -> bool {
 // A cast's cost (FUN_0056bfe0, after the skill's start or do function):
 // from a charged entry for that skill, one charge (FUN_0056bec0) and no
 // mana; else its mana.
-auto Fight::charged(int skill) const -> bool { return actor->charge.item >= 0 && actor->charge.skill == skill; }
-auto Fight::cost_of(const d2d::rules::Skill& skill, int lvl) const -> int { return charged(skill.id) ? 0 : d2d::rules::mana_cost(skill, lvl); }
+auto Fight::from_charges(int skill) const -> bool { return actor->item_charge.item >= 0 && actor->item_charge.skill == skill; }
+auto Fight::charge_live() const -> bool {
+        const auto& cast = actor->item_charge;
+        return std::ranges::any_of(charged_skills(actor->character.items),
+                                   [&](const ChargedSkill& had) { return had.item == cast.item && had.skill == cast.skill && had.level == cast.level; });
+    }
+auto Fight::cast_level(int skill) const -> int {
+        if (from_charges(skill) && !charge_live()) return 0;
+        return skill_level ? skill_level(skill) : 0;
+    }
+auto Fight::cost_of(const d2d::rules::Skill& skill, int lvl) const -> int { return from_charges(skill.id) ? 0 : d2d::rules::mana_cost(skill, lvl); }
 auto Fight::pay(const d2d::rules::Skill& skill, int cost) -> void {
-        if (charged(skill.id)) (void)use_charge(actor->character.items, actor->charge);
+        if (from_charges(skill.id)) (void)use_charge(actor->character.items, actor->item_charge);
         else actor->character.stats.values[d2d::d2s::kMana] -= cost;
     }
 
@@ -4331,7 +4341,7 @@ auto Fight::cast(int skill, std::uint32_t now_ms) -> bool {
         using namespace d2d::d2s;
         const auto* skill_row = game_data->skills.get(skill);
         if (!skill_row || dead() || actor->pmode >= 0 || !self_cast(*skill_row)) return false;
-        const int lvl = skill_level ? skill_level(skill) : 0;
+        const int lvl = cast_level(skill);
         const int cost = cost_of(*skill_row, lvl);
         if (lvl > 0 && actor->character.stats.values[kMana] < cost) need_mana(now_ms);
         if (lvl <= 0 || actor->character.stats.values[kMana] < cost) return false;

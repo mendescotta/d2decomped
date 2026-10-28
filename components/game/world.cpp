@@ -1827,6 +1827,7 @@ auto World::display_swing(int skill, float x, float y, std::uint32_t now_ms) -> 
         if (actor->pmode >= 0 || fight.dead()) return;
         actor->attack_mon = -1;
         actor->attack_skill = skill;
+        actor->attack_charge = {};                    // the host spends the charge; this swing is for show
         actor->interact_npc = actor->pick_item = actor->take_warp = -1;
         actor->player.walking = false;
         actor->player.dir = direction16(x - actor->player.x, y - actor->player.y);
@@ -2578,15 +2579,20 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
         // A charged entry's cast (UseSkill::item): only while the entry is
         // there, its item active with charges left (FUN_00647840; a client
         // with none starts nothing, FUN_004c6140). Its level and cost go
-        // with the cast, so they change only between casts.
+        // with the cast, so they change only between casts; a queued attack
+        // keeps its own (attack_charge), which start_swing takes up.
         ChargedSkill entry;
         if (use_skill.item >= 0) {
             const auto entries = charged_skills(actor->character.items);
             const auto found = std::ranges::find_if(entries, [&](const ChargedSkill& had) { return had.item == use_skill.item && had.skill == use_skill.skill; });
-            if (found == entries.end()) { if (actor->pmode < 0) actor->charge = {}; return; }
+            if (found == entries.end()) {
+                if (actor->pmode < 0) actor->item_charge = {};
+                if (actor->attack_charge.item == use_skill.item) { actor->attack_mon = -1; actor->attack_charge = {}; }   // a held attack from it stops
+                return;
+            }
             entry = *found;
         }
-        if (actor->pmode < 0) actor->charge = entry;
+        if (actor->pmode < 0) actor->item_charge = entry;
         const auto* skill = game_data->skills.get(use_skill.skill);
         const int monster_index = fight.monster_index(use_skill.unit);
         const bool live = monster_index >= 0 && fight.monsters[std::size_t(monster_index)].targetable();
@@ -2599,6 +2605,7 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
             actor->move_x = use_skill.x; actor->move_y = use_skill.y;
             actor->attack_mon = -1;
             actor->attack_skill = use_skill.skill;
+            actor->attack_charge = entry;
             actor->interact_npc = actor->pick_item = -1;
             actor->player.walking = false;
             actor->player.dir = direction16(actor->move_x - actor->player.x, actor->move_y - actor->player.y);
@@ -2615,6 +2622,7 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
             actor->interact_npc = actor->pick_item = -1;
             actor->attack_mon = monster_index;
             actor->attack_skill = use_skill.skill;
+            actor->attack_charge = entry;
         }
     }
 

@@ -29,6 +29,7 @@
 #include <skills.hpp>
 #include <weather.hpp>
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -395,6 +396,15 @@ struct Town {
     std::vector<int> gossip_pick;          // per world NPC: chosen gossip topic, -1 = not yet
     SkillBar skillbar{ scene, character };        // the skill buttons, picker and hotkeys (skillbar.hpp)
     int skillbar_set = -1;                        // the weapon set the buttons' skills are for
+    // Each local player's charged entries on their hands and hotkeys (the
+    // items' ids, -1 none), by Hero::id, while the screen's skillbar is
+    // another player's: the save keeps skill ids only (header +0x38..).
+    struct HandItems {
+        int left = -1, right = -1;
+        std::array<int, 16> hotkeys = [] { std::array<int, 16> none{}; none.fill(-1); return none; }();
+    };
+    std::map<int, HandItems> hand_items;
+    void load_hands(int id);                      // the skillbar's items from hand_items[id] (none yet: -1)
     int   hovered_npc = -1;                // Level::npcs index under the cursor (last frame); <= -10: monster -10 - i
     std::uint32_t now_ms = 0;              // this frame's ms (devctl)   // shrines / chests used: when
     bool  player_walked = false;           // `walking` as of the last frame

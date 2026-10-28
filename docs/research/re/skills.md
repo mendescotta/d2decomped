@@ -514,7 +514,7 @@ lines (missile names aren't passed in). What it does:
   FUN_004c9280), the skill picker by SkillsPal.cpp (FUN_004c9b40); icons
   are `Spells\<Cl>Skillicon` (already loaded for the tree).
 
-### Item charges (traced 2026-10-28; todo #4)
+### Item charges (traced 2026-10-28)
 - Stat 0xcc (204, item_charged_skill): param skill << 6 | level, value
   max << 8 | left.
 - Entries: the server's stat hook adds a skill entry per item and skill
@@ -529,13 +529,25 @@ lines (missile names aren't passed in). What it does:
   0; stat packet 0x3e). FUN_005531c0 there is the unit's client, not a
   sound. `Fight::pay`.
 - Usable (FUN_00647840): the entry's item still in the inventory with the
-  stat nonzero. The client starts nothing from an entry with 0 charges and
+  stat nonzero, checked when the cast is paid for: an entry gone between
+  the click and the swing (used up, unequipped, the weapons swapped) casts
+  nothing (`Fight::cast_level`). A queued attack keeps its own entry
+  (`Hero::attack_charge`). The client starts nothing from an entry with 0 charges and
   plays the skill's ItemCastSound for an entry's cast (FUN_004c6140,
   Skills.txt +0x122), as for a scroll.
-- Picker (SPELLSEL_DrawSkillGrid): rows 0..3 by ListRow, the entries on
-  the top row; the charges left on the icon and the button
+- Picker (SPELLSEL_DrawSkillGrid): rows 0..4 by SkillDesc ListRow; row 4
+  holds only the scrolls and tomes (identify, town portal), and the entries
+  join them there; the charges left on the icon and the button
   (SPELLSEL_DrawSkillLevel: x + 4, the icon's bottom - 1, colour 3).
   Hotkeys keep the entry's item. d2d: `SkillBar::Pick`, `UseSkill::item`.
+- Tooltip: the button's and the picker's (FUN_004a8d50 -> FUN_004ef990:
+  unit, skill, level, calc, draw mode, x, y) is the plain skill tooltip at
+  the entry's level, "%d" its only number. No charges line: the charges
+  show only on the icon.
+- Joined game: the hand's select (C->S 0x3c) carries the entry's item as
+  the host knows it, -1 for the character's own skill.
+- Local co-op: each player's hands and hotkeys keep their entries while
+  another player has the screen (`Town::hand_items`).
 - Load: the save keeps skill ids only and a loaded game selects the
   character's own entry (SelectSkill(id, -1)), so a saved charged hand
   falls back.

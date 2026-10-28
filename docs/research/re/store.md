@@ -176,7 +176,7 @@ The price function computes buy, sell and repair together. Repair:
    a stacking throwable (ItemsTxt +0x132 stackable, FUN_006289f0) pays
    per unit instead: base / max stack × the missing quantity;
 4. × npc.txt rep mult and the quest rep mults / 1024; minimum 1;
-5. plus the charge recharge cost (FUN_00628d30) — not in d2d yet.
+5. plus the charge recharge cost (FUN_00628d30): `rules::charges_repair_cost`.
 
 The repair itself (`FUN_005761c0`): a stacking throwable's quantity back
 to its max stack (`FUN_006295b0`); a broken item (flag 0x100) unbroken

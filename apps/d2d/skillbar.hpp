@@ -125,9 +125,9 @@ struct SkillBar {
 
     // The picker's rows, bottom up, keyed on SkillDesc ListRow (0..4):
     // row 0 the general skills (Attack, Throw, Unsummon, Town Portal),
-    // 1..4 the class's own. Rows that have nothing to offer collapse; the
-    // remainder stack immediately above the button. spellsel.cpp
-    // FUN_004aa7e0's four-panel fan. The charged entries go on the top row.
+    // 1..3 the class's own, 4 the scrolls and tomes. Rows that have nothing
+    // to offer collapse; the remainder stack immediately above the button.
+    // spellsel.cpp FUN_004aa7e0's fan. The charged entries join row 4.
     [[nodiscard]] std::vector<std::vector<Pick>> rows(bool on_left) const {
         std::vector<std::vector<Pick>> out(kRows);
         for (const auto& skill : scene->skills.rows)

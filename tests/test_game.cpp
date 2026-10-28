@@ -663,17 +663,29 @@ int main(int argc, char** argv) try {
         caster.character.items.push_back(ring);
         const std::uint32_t cast_ms = 26 * kTickMs;
         const float aim_x = caster.player.x + 2, aim_y = caster.player.y;
+        {   // Taken off between the command and the cast: checked where it's paid (FUN_00647840), no cast, nothing spent.
+            caster.pmode = -1;
+            world.apply(cmd::UseSkill{ fire_bolt, aim_x, aim_y, -1, false, 9001 }, cast_ms);
+            auto& worn = caster.character.items[saved_items.size()];
+            worn.location = loc::kStored;
+            assert(world.fight.cast_level(fire_bolt) == 0 && !world.fight.cast_missile(fire_bolt, aim_x, aim_y, cast_ms));
+            assert(worn.props[0].value == (2 << 8 | 2) && caster.character.stats.values[d2d::d2s::kMana] == mana);
+            worn.location = loc::kEquipped;
+        }
         for (int cast = 0; cast < 2; ++cast) {
             caster.pmode = -1;
             world.apply(cmd::UseSkill{ fire_bolt, aim_x, aim_y, -1, false, 9001 }, cast_ms);   // in town: no cast, the entry taken
-            assert(caster.charge == (ChargedSkill{ 9001, fire_bolt, 4, 2 - cast, 2 }) && world.fight.skill_level(fire_bolt) == 4);
+            assert(caster.item_charge == (ChargedSkill{ 9001, fire_bolt, 4, 2 - cast, 2 }) && world.fight.skill_level(fire_bolt) == 4);
             assert(world.fight.cast_missile(fire_bolt, aim_x, aim_y, cast_ms));
             assert(caster.character.stats.values[d2d::d2s::kMana] == mana);
         }
         assert(caster.character.items[saved_items.size()].props[0].value == (2 << 8 | 0) && charged_skills(caster.character.items).empty());
         caster.pmode = -1;
+        caster.attack_mon = 0;                                    // a held attack from the entry: stops with it
+        caster.attack_charge = ChargedSkill{ 9001, fire_bolt, 4, 1, 2 };
         world.apply(cmd::UseSkill{ fire_bolt, aim_x, aim_y, -1, false, 9001 }, cast_ms);
-        assert(caster.charge.item == -1 && world.fight.skill_level(fire_bolt) == 0);
+        assert(caster.item_charge.item == -1 && world.fight.skill_level(fire_bolt) == 0);
+        assert(caster.attack_mon == -1 && caster.attack_charge.item == -1);
         caster.character.items = saved_items;
     }
 

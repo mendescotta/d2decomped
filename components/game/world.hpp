@@ -511,7 +511,7 @@ struct World {
         // FUN_00644180 adding item_allskills to every skill).
         fight.skill_base = [this](int id) { return skill_base_level(*game_data, actor->character, id); };
         fight.skill_level = [this](int id) {
-            if (fight.charged(id)) return actor->charge.level;   // a charged entry's own level: no +skills (the entry's, SKILLS_AddOrRemoveItemSkill)
+            if (fight.from_charges(id)) return actor->item_charge.level;   // a charged entry's own level: no +skills (the entry's, SKILLS_AddOrRemoveItemSkill)
             std::vector<d2d::d2s::ItemProp> extra;
             if (now < actor->boost.until)
                 for (const auto& [stat, value] : actor->boost.stats) if (stat == d2d::d2s::kAllSkills) extra.push_back({ .stat = d2d::d2s::kAllSkills, .value = value });

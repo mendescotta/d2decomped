@@ -249,7 +249,8 @@ struct Fight {
         // and the strikes still to come (Dragon Talon's kicks, Zeal's hits).
         int   attack_skill = 0, swing_skill = 0, kicks_left = 0;
         bool  item_cast = false;              // swing_skill is cast from an item (a scroll): its ItemCastSound
-        ChargedSkill charge;                  // the charged entry the cast came from (UseSkill::item; item -1 none): its level, a charge for its cost
+        ChargedSkill item_charge;             // the charged entry the cast came from (UseSkill::item; item -1 none): its level, a charge for its cost
+        ChargedSkill attack_charge;           // the queued attack's (attack_skill's) entry, item_charge once its swing starts
         int   struck_class = 0;               // the last hit on the player's hit class (unit +0xb0): its impact on GH / DT
         int   shown_class = 0;                // the hit class the client last had, any landed hit's (GH or S->C 0x0c): its block sound
         std::int64_t self_hurt = 0;            // life (256ths) the player's own skills cost (Sacrifice), taken with the monsters' hits
@@ -1024,7 +1025,13 @@ struct Fight {
     bool cast(int skill, std::uint32_t now_ms);
     // A cast's cost (FUN_0056bfe0): a charged entry's (Hero::charge, for
     // that skill) is a charge and no mana, else the skill's mana.
-    [[nodiscard]] bool charged(int skill) const;
+    [[nodiscard]] bool from_charges(int skill) const;
+    // The cast's entry still there at cast time (FUN_00647840): its item
+    // active, the same level, charges left.
+    [[nodiscard]] bool charge_live() const;
+    // A cast's level where it's paid for: 0 (no cast) from an entry that
+    // went between the command and the cast (used up, unequipped, swapped).
+    [[nodiscard]] int cast_level(int skill) const;
     [[nodiscard]] int cost_of(const d2d::rules::Skill& skill, int lvl) const;
     void pay(const d2d::rules::Skill& skill, int cost);
     // Frenzy's state (FUN_005d8c70): each hit that lands raises it a level,
