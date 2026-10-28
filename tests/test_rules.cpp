@@ -348,9 +348,9 @@ int main() {
         apply_mod(gamble_tables, { "charged", "Frost Nova", -20, 0 }, got, still);   // no item: ilvl 1, level 1, full
         assert(got.size() == 1 && got[0].param == (44 << 6 | 1) && got[0].value == 22 + 22 * 256 && still.low == 9);
         got.clear();
-        d2d::d2s::Item wand;
-        wand.ilvl = 30;
-        const ModItem cap_item{ &wand, &gamble_tables.item_base["cap"], 1, false, false };
+        d2d::d2s::Item item30;
+        item30.ilvl = 30;
+        const ModItem cap_item{ &item30, &gamble_tables.item_base["cap"], 1, false, false };
         apply_mod(gamble_tables, { "charged", "Frost Nova", -20, 0 }, got, still, &cap_item);   // level (30 - 6) / 4 + 1 = 7
         const int charges = 20 + 20 * 7 / 8;
         assert(got.size() == 1 && got[0].param == (44 << 6 | 7) && got[0].value >> 8 == charges);
