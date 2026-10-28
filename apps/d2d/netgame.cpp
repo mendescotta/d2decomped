@@ -664,22 +664,22 @@ auto NetGame::set_running(bool run) -> void {
     if (session.state() == d2d::net::JoinState::InGame) send({ d2d::net::d2gs::c2s::set_running(run) });
 }
 
-auto NetGame::select(int skill, bool left) -> void {
+auto NetGame::select(int skill, bool left, std::uint32_t item) -> void {
     auto& held = hand_skill[left ? 1 : 0];
-    if (held == skill) return;
-    held = skill;
-    send({ d2d::net::d2gs::c2s::select_skill(skill, left) });
+    if (held == std::pair{ skill, item }) return;
+    held = { skill, item };
+    send({ d2d::net::d2gs::c2s::select_skill(skill, left, item) });
 }
 
-auto NetGame::skill_at(int skill, bool left, float subtile_x, float subtile_y) -> void {
+auto NetGame::skill_at(int skill, bool left, float subtile_x, float subtile_y, std::uint32_t item) -> void {
     if (session.state() != d2d::net::JoinState::InGame || subtile_x < 0 || subtile_y < 0) return;
-    select(skill, left);
+    select(skill, left, item);
     send({ d2d::net::d2gs::c2s::skill_at(left, std::uint16_t(subtile_x), std::uint16_t(subtile_y)) });
 }
 
-auto NetGame::skill_on(int skill, bool left, int type, std::uint32_t id) -> void {
+auto NetGame::skill_on(int skill, bool left, int type, std::uint32_t id, std::uint32_t item) -> void {
     if (session.state() != d2d::net::JoinState::InGame) return;
-    select(skill, left);
+    select(skill, left, item);
     send({ d2d::net::d2gs::c2s::skill_on(left, std::uint32_t(type), id) });
 }
 

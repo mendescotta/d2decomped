@@ -87,8 +87,9 @@ struct NetGame {
     auto swap_weapons() -> void;   // C->S 0x60: the weapon switch
     // Skills: the hand's skill first when it changed (0x3c), then 05 / 0c
     // at a point or 06 / 0d on a unit.
-    auto skill_at(int skill, bool left, float subtile_x, float subtile_y) -> void;
-    auto skill_on(int skill, bool left, int type, std::uint32_t id) -> void;
+    // `item`: the host's id of a charged entry's item (0x3c's second dword; none -1).
+    auto skill_at(int skill, bool left, float subtile_x, float subtile_y, std::uint32_t item = 0xffffffff) -> void;
+    auto skill_on(int skill, bool left, int type, std::uint32_t id, std::uint32_t item = 0xffffffff) -> void;
     auto interact(int type, std::uint32_t id) -> void;
     auto waypoint(std::uint32_t id, int level) -> void;
     auto pick_up(std::uint32_t id) -> void;
@@ -228,8 +229,8 @@ private:
     bool died = false;
     d2d::net::Bytes last_sent;
     std::uint32_t last_sent_ms = 0;
-    std::array<int, 2> hand_skill{ -1, -1 };   // what the host has on the right / left hand
-    auto select(int skill, bool left) -> void;
+    std::array<std::pair<int, std::uint32_t>, 2> hand_skill{ { { -1, 0xffffffff }, { -1, 0xffffffff } } };   // what the host has on the right / left hand, and its item
+    auto select(int skill, bool left, std::uint32_t item) -> void;
     NetGame(d2d::net::JoinSession joined, d2d::net::TcpConnection socket, const std::filesystem::path& log_path);
     auto handle(const d2d::net::Bytes& packet) -> void;
     auto send(const std::vector<d2d::net::Bytes>& packets) -> void;

@@ -150,6 +150,7 @@ auto Fight::new_game(int difficulty) -> void {
         actor->stamina_pot = {};
         actor->pets.clear();
         actor->attack_mon = -1;
+        actor->charge = {};                                   // no cast from a charged entry carried in
         actor->pmode = -1;
         actor->struck_class = actor->shown_class = 0;   // a new game's unit: no hit class yet
     }

@@ -478,6 +478,9 @@ auto Town::send(const Command& command) -> void {
             const auto* skill = scene->skills.get(use->skill);
             const bool melee = skill && !self_cast(*skill) && !world.fight.missile_skill(*skill) && !Fight::spot_skill(*skill) && !world.fight.summon_skill(*skill);
             const auto target = use->unit >= 0 ? net_monsters.find(std::uint32_t(use->unit)) : net_monsters.end();
+            std::uint32_t item = 0xffffffff;                // a charged entry's item, as the host knows it
+            if (const auto local = std::ranges::find(character.items, use->item, &d2d::d2s::Item::id); use->item >= 0 && local != character.items.end())
+                if (const auto host = net_game->host_item(*local); host != 0) item = host;
             if (target != net_monsters.end()) {
                 // The host drops a skill that comes mid-swing (FUN_0057edd0:
                 // modes A1 / A2 / SC / TH take one only once FUN_0057ed70 says
@@ -485,7 +488,7 @@ auto Town::send(const Command& command) -> void {
                 // target again once the swing here is over, as game.exe's
                 // client, which runs its own copy of the mode.
                 const bool again = use->unit == net_attack && use->skill == net_attack_skill;
-                if (!again || hero.pmode < 0) net_game->skill_on(use->skill, use->left, 1, std::uint32_t(use->unit));
+                if (!again || hero.pmode < 0) net_game->skill_on(use->skill, use->left, 1, std::uint32_t(use->unit), item);
                 net_attack = use->unit;
                 net_attack_skill = use->skill;
                 const auto& monster = target->second;
@@ -498,7 +501,7 @@ auto Town::send(const Command& command) -> void {
                 return;
             }
             net_attack = -1;
-            net_game->skill_at(use->skill, use->left, subtile_x(use->x), subtile_y(use->y));
+            net_game->skill_at(use->skill, use->left, subtile_x(use->x), subtile_y(use->y), item);
         } else if (const auto* pickup = std::get_if<cmd::Pickup>(&command)) {
             // A host item: the host takes it only within 5 subtiles and doesn't
             // walk us up for it (FUN_00548b00 case 4), so we walk there, it

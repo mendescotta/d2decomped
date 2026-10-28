@@ -144,6 +144,9 @@ int main() try {
         assert(d2gs::c2s::ping(1234).size() == 13);
         // Chat to all: type 1, language 0, the message, no target (54a5d0 wants size > length + 4).
         assert((d2gs::c2s::chat("hi") == d2d::net::Bytes{ 0x15, 0x01, 0x00, 'h', 'i', 0x00, 0x00, 0x00 }));
+        // 0x3c: the hand's skill (bit 31 the left) and a charged entry's item, else -1.
+        assert((d2gs::c2s::select_skill(54, true, 0x1234) == d2d::net::Bytes{ 0x3c, 54, 0, 0, 0x80, 0x34, 0x12, 0, 0 }));
+        assert((d2gs::c2s::select_skill(0, false) == d2d::net::Bytes{ 0x3c, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff }));
         // 0x31: 9 bytes, the host's size check (54ba90); Atma's 304 heard.
         assert((d2gs::c2s::quest_message(0x12345678, 304) == d2d::net::Bytes{ 0x31, 0x78, 0x56, 0x34, 0x12, 0x30, 0x01, 0x00, 0x00 }));
         // 0x27 mode 1: Atma's greeting (kind 0) and a topic (kind 2); a lone
