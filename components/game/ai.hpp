@@ -341,12 +341,12 @@ struct Monster {
     d2d::rules::MonProps props;               // its MonProp row's (d2d::rules::monster_props)
     int players = 1;                          // the players in the game as it was made (stat 0x64 monster_playercount)
     [[nodiscard]] bool alive() const { return hit_points > 0 && !gone; }
-    [[nodiscard]] bool targetable() const { return alive() && killable && !buried && !aloft && !riding; }
+    [[nodiscard]] bool targetable() const { return alive() && killable && !buried && !aloft && !riding; }   // unit flags 0xe: not a buried maggot, a vulture aloft, a riding imp, an unkillable one
     // On the player's side with nothing to talk about: a converted monster (align 2; a town NPC is
     // align 2 too, but MonStats interact). game.exe's cursor drops it (HitTestScreen: CanInteractWith).
     [[nodiscard]] bool ally_not_interact(const GameData& game_data) const {
         return align == 2 && !(type >= 0 && std::size_t(type) < game_data.monsters.types.size() && game_data.monsters.types[std::size_t(type)].interact);
-    }   // unit flags 0xe: not a buried maggot, a vulture aloft, a riding imp, an unkillable one
+    }
     // As a target for the player's (or the merc's) hits.
     [[nodiscard]] d2d::rules::Target target(const GameData& game_data) const {
         const auto& type_info = game_data.monsters.types[std::size_t(type)];
