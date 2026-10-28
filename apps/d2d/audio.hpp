@@ -275,19 +275,19 @@ struct Audio {
     bool may_start(const GameData& game_data, int index, std::uint64_t unit, bool positioned) {
         const auto& snd = game_data.sounds[std::size_t(index)];
         std::vector<d2d::rules::SoundInstance> playing;
-        std::vector<Channel*> of;
+        std::vector<Channel*> on_channel;          // playing[k]'s channel
         for (auto& channel : sfx) {
             if (!channel.src || channel.sound <= 0) continue;
             ALint state = AL_STOPPED;
             alGetSourcei(channel.src, AL_SOURCE_STATE, &state);
             if (state != AL_PLAYING && state != AL_PAUSED) continue;
             playing.push_back({ channel.sound, channel.group_base, channel.unit, channel.start_tick, false });
-            of.push_back(&channel);
+            on_channel.push_back(&channel);
         }
         const d2d::rules::SoundRule rule{ index, snd.group_base, snd.compound, snd.defer, snd.stop_inst };
         if (d2d::rules::compound_into(playing, rule, sound_tick)) return false;
         const auto clash = d2d::rules::start_clash(playing, rule, unit, positioned);
-        if (clash.other && clash.stop_other) stop(*of[*clash.other]);
+        if (clash.other && clash.stop_other) stop(*on_channel[*clash.other]);
         return clash.play;
     }
     void started(Channel& channel, const GameData& game_data, int index, std::uint64_t unit) {
