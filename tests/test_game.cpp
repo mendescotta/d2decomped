@@ -832,6 +832,29 @@ int main(int argc, char** argv) try {
     world.tick({}, (902 + 3600) * kTickMs, (901 + 3600) * kTickMs);
     assert(world.actor->boost.shrine == 0 && world.actor->player_combat.res[0] == fire);
     std::printf("OK: shrines: stamina filled, one state at a time, resist fire for 3600 frames\n");
+    {   // A converted monster is no target: game.exe's cursor drops a unit the player can't
+        // interact with (HitTestScreen: CanInteractWith is !IsAllyOf), so an attack names it only
+        // through devctl or the net; World turns that away too and the hero stays put.
+        auto& hero = *world.actor;
+        Monster turned;
+        turned.id = 0x7ffff0;
+        turned.hit_points = 100;
+        turned.align = 2;
+        turned.unit.x = hero.player.x + 2;
+        turned.unit.y = hero.player.y;
+        world.fight.monsters.push_back(turned);
+        const auto index = int(world.fight.monsters.size() - 1);
+        hero.attack_mon = -1;
+        const std::vector<Order> attack{ { hero.id, cmd::UseSkill{ 0, turned.unit.x, turned.unit.y, turned.id, true } } };
+        world.tick(attack, (4502 + 1) * kTickMs, 4502 * kTickMs);
+        assert(hero.attack_mon == -1);
+        world.fight.monsters[std::size_t(index)].align = 0;   // the same monster, hostile: attacked
+        world.tick(attack, (4502 + 2) * kTickMs, (4502 + 1) * kTickMs);
+        assert(hero.attack_mon == index);
+        hero.attack_mon = -1;
+        world.fight.monsters.pop_back();
+        std::printf("OK: a converted monster isn't attacked\n");
+    }
 
     // A row with no Skill (Meteor's fire): its EDmgSymPerCalc, skill('Inferno'.blvl) * 3, adds
     // that percent to EMin + brackets before HitShift (FUN_0064b100 / FUN_0064b1d0).
