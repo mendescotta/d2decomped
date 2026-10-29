@@ -57,16 +57,19 @@ namespace d2d::game {
 
 // Levels.txt Waypoint: a level's index in the waypoint bits (FUN_00660e00), -1 none.
 // `level`'s units states, the ones its rooms made since (populate) added as they start.
-// The client's ticks from an object's OP to its ON (FUN_004bcbb0): the
-// counter runs from Start1 at FrameDelta1 a tick (FUN_00624390) until it
-// reaches FrameCnt1 - 1; -1: never (FrameCnt1 1, or a counter that doesn't move).
+// The ticks from an object's OP to its ON. The client's own counter
+// (FUN_004bcbb0) runs from Start1 at FrameDelta1 a tick (FUN_00624390)
+// until it reaches FrameCnt1 - 1, never for FrameCnt1 1 or a counter that
+// doesn't move; the server's event 1 (FUN_005417d0) takes it to mode 2
+// FrameCnt1 + 1 ticks on regardless. Whichever comes first.
 static int op_ticks(const Npc& npc) {
     if (!npc.op_frames) return 0;
-    if (npc.frames[1] == 1) return -1;
+    const int server = npc.op_frames + 1;
+    if (npc.frames[1] == 1) return server;
     const int need = (int(npc.frames[1]) - 1 - int(npc.loop_from[1])) * 256;
     if (need <= 0) return 0;
-    if (!npc.frame_delta[1]) return -1;
-    return (need + npc.frame_delta[1] - 1) / npc.frame_delta[1];
+    if (!npc.frame_delta[1]) return server;
+    return std::min(server, (need + npc.frame_delta[1] - 1) / npc.frame_delta[1]);
 }
 
 static void grow_states(std::vector<UnitState>& states, const Level& level) {
@@ -2775,8 +2778,8 @@ auto World::tick(std::span<const Order> orders, std::uint32_t now_ms, std::uint3
             const bool back = reset > 0 && now_ms - when_ms >= d2d::rules::shrine_reset_frames(reset) * kTickMs;
             if (key.first == level && npc_index < npc_states.size()) {
                 const auto on_ticks = op_ticks(npc);
-                const std::uint32_t on_ms = on_ticks < 0 ? 0 : when_ms + std::uint32_t(on_ticks) * kTickMs;
-                const bool opening = on_ticks < 0 || now_ms < on_ms;
+                const std::uint32_t on_ms = when_ms + std::uint32_t(on_ticks) * kTickMs;
+                const bool opening = now_ms < on_ms;
                 const std::string_view mode = back ? std::string_view{} : opening ? "OP" : "ON";
                 // Its footprint in the new mode (ON: FUN_00623830 when HasCollision2 is off; jugs q4 / q5, xj).
                 // ponytail: on this level's tick only; one left mid-OP keeps OP's until it's back in view.
