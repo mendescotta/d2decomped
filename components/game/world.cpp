@@ -2948,8 +2948,9 @@ auto World::tick(std::span<const Order> orders, std::uint32_t now_ms, std::uint3
             const bool back = reset > 0 && now_ms - when_ms >= d2d::rules::shrine_reset_frames(reset) * kTickMs;
             if (key.first == level && npc_index < npc_states.size()) {
                 const auto on_ticks = object_op_ticks(npc);
-                const std::uint32_t on_ms = when_ms + std::uint32_t(on_ticks) * kTickMs;
-                const bool opening = now_ms < on_ms;
+                const bool never_on = on_ticks < 0;
+                const std::uint32_t on_ms = never_on ? 0 : when_ms + std::uint32_t(on_ticks) * kTickMs;
+                const bool opening = never_on || now_ms < on_ms;
                 const std::string_view mode = back ? std::string_view{} : opening ? "OP" : "ON";
                 // Its footprint in the new mode (ON: FUN_00623830 when HasCollision2 is off; jugs q4 / q5, xj).
                 // ponytail: on this level's tick only; one left mid-OP keeps OP's until it's back in view.

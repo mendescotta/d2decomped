@@ -1014,6 +1014,25 @@ int main(int argc, char** argv) try {
     world.tick({}, (902 + 3600) * kTickMs, (901 + 3600) * kTickMs);
     assert(world.actor->boost.shrine == 0 && world.actor->player_combat.res[0] == fire);
     std::printf("OK: shrines: stamina filled, one state at a time, resist fire for 3600 frames\n");
+    {
+        // A client-only one-frame OP has no transition deadline; it must stay
+        // OP rather than wrapping the -1 sentinel into a past uint32 time.
+        Level one_frame_moor = *moor;
+        auto& one_frame = one_frame_moor.npcs[std::size_t(shrine_index)];
+        one_frame.op_frames = 1;
+        one_frame.mode2 = false;
+        one_frame.frames[1] = 1;
+        one_frame.frame_delta[1] = 0;
+        world.level = &one_frame_moor;
+        world.swap_npcs(moor);
+        world.operate(shrine_index, 5000 * kTickMs, 14);
+        world.tick({}, 5001 * kTickMs, 5000 * kTickMs);
+        assert(object_op_ticks(one_frame) == -1 && world.npc_states[std::size_t(shrine_index)].mode == "OP");
+        world.level = moor;
+        world.swap_npcs(&one_frame_moor);
+        world.operated.erase({ &one_frame_moor, shrine_index });
+        world.other_npcs.erase(&one_frame_moor);
+    }
     {   // A converted monster is no target: game.exe's cursor drops a unit the player can't
         // interact with (HitTestScreen: CanInteractWith is !IsAllyOf), so an attack names it only
         // through devctl or the net; World turns that away too and the hero stays put.
