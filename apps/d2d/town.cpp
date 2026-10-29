@@ -37,6 +37,7 @@
 #include <quests.hpp>
 #include <quests_act5.hpp>
 #include <rules.hpp>
+#include <shake.hpp>
 #include <screenshot.hpp>
 #include <skills.hpp>
 #include <object_sounds.hpp>
@@ -427,6 +428,7 @@ auto Town::publish() -> void {
 static std::filesystem::path automap_dir(const World& world) { return world.characters ? world.characters->dir : std::filesystem::path{}; }
 
 auto Town::enter() -> void {
+        shake = {}; quest_quakes.clear(); shake_rng = d2d::rules::Rng{ 666 };
         automap.cells.clear();                    // a new game: what the files beside the save kept
         automap.placed.clear();
         other_automaps.clear();
@@ -1984,6 +1986,13 @@ auto Town::update(std::vector<std::uint8_t>& framebuffer, const Mouse& frame_mou
                 npc_menu = {}; speech = {}; menu_after_speech = -1;
             }
         }
+        std::erase_if(quest_quakes, [&](d2d::rules::QuestQuake& control) {
+            return control.step(frame_ms, shake, [&] {
+                if (const auto found = scene->sound_index.find("monster_diablo_taunt_1"); found != scene->sound_index.end())
+                    audio.play_sfx(*scene, found->second, 1.f, 0);
+            });
+        });
+        audio.quake(*scene, shake.step(frame_ms, shake_rng));
         play_cues(cues, audio, view.player.x, view.player.y, rng, frame_ms);
         object_sounds(audio, frame_ms, view.player.x, view.player.y);
         audio.stop_owners([&](int owner) { return owner > 0 ? std::ranges::contains(view.missiles, owner, &d2d::game::View::Shot::sound) : std::ranges::contains(object_loops, owner); });
@@ -2667,6 +2676,9 @@ auto Town::walk(const Mouse& mouse, bool over_ui, Audio& audio, std::uint32_t fr
             }
             for (const int quest : net_game->quest_news) quest_log_notify(quest_log, quest);
             net_game->quest_news.clear();
+            for (const auto kind : std::exchange(net_game->quest_quakes, {}))
+                if (kind != d2d::rules::QuestQuake::diablo || level->id == d2d::rules::level_ids::kChaosSanctuary)
+                    quest_quakes.push_back({ kind, frame_ms });
             if (net_game->movie >= 0) world.movie = std::exchange(net_game->movie, -1);
             // Our stats as the host sets them: attributes, points, life / mana /
             // stamina and their maxima (8.8 fixed point, as in a save), level,
@@ -2974,10 +2986,12 @@ auto Town::handle(const Event& event, Audio& audio, std::uint32_t frame_ms) -> v
             prev_x += float(level_changed->from->world_x - level->world_x);
             prev_y += float(level_changed->from->world_y - level->world_y);
             npc_menu = {}; store = {}; speech = {}; waypoint = {}; menu_after_speech = -1;
+            shake = {}; quest_quakes.clear(); audio.stop_quake();
             level_ms = frame_ms;                                  // its song comes in 3 s later
             rain.reassign(rain.rng, level->id, d2d::rules::level_ids::act_of(level->id));   // the host's 0x15 for the warp
             return;
         }
+        if (const auto* quake = std::get_if<ev::QuestQuake>(&event)) { quest_quakes.push_back({ quake->kind, frame_ms }); return; }
         if (std::holds_alternative<ev::Lightning>(event)) { rain.set_off(); return; }
         if (std::holds_alternative<ev::Reassigned>(event)) { rain.reassign(rain.rng, level->id, d2d::rules::level_ids::act_of(level->id)); return; }
         if (const auto* news = std::get_if<ev::QuestNews>(&event)) { quest_log_notify(quest_log, news->quest); return; }
@@ -3325,6 +3339,10 @@ auto Town::draw_view(std::vector<std::uint8_t>& framebuffer, std::vector<std::ui
             party_y = party_jump ? want_y : party_y + (want_y - party_y) * ease;
             cam_x = party_x; cam_y = party_y;
         }
+        // Inverse isometric projection: shift the camera, keeping every
+        // world unit (including the local player) at its actual position.
+        cam_x += float(shake.offset.first) / kIsoW + float(shake.offset.second) / kIsoH;
+        cam_y += float(shake.offset.second) / kIsoH - float(shake.offset.first) / kIsoW;
         const std::pair<float, float> hero_at{ hero_x, hero_y };
         state_clock.now = frame_ms;
         view_units(*scene, view, cam_x, cam_y, &merc_label, extra, den_beams, frame_ms, &character.name, std::max(character.character_class, 0), &state_clock);

@@ -358,12 +358,12 @@ keeps playing sounds: `FUN_0044efa0` still runs the sound tick
 ## In d2d
 
 `tools/sound_coverage.py` lists the base install's sounds d2d can't play yet
-(3,414 / 3,520 covered). Energy Shield, Barbarian Leap, restricted town skill
+(3,416 / 3,520 covered). Energy Shield, Barbarian Leap, restricted town skill
 attempts, successful life / mana leech, missile ProgSound, and ten classic
-quest music cues now have event paths. The music cues fire on the quest
+quest music cues now have event paths. Andariel death and Diablo arrival now shake the camera and play the quake loop; Diablo also taunts when its arrival missile has 50 frames remaining. The music cues fire on the quest
 completion event and play as one-shots.
 
-The remaining 106 rows have these causes:
+The remaining 104 rows have these causes:
 
 | Rows | Why they are still silent |
 |---|---|
@@ -371,14 +371,13 @@ The remaining 106 rows have these causes:
 | 5 `event_desert_night_1..5` | No SoundEnviron row selects these names. The desert environments use their daytime event group at night too. |
 | 8 `rogue_confirm_*` | Unit sound event 0xf on a Rogue (class 0x10f, FUN_004cb9c0). The server sends it only from C→S 0x46's handler (FUN_0054c4b0 → FUN_0054c430: the player's merc sent to a unit), and the stock client never builds 0x46, so stock 1.14d never plays them. |
 | 13 NPC speech rows | Alkor, Asheara, Cain's act 4 greeting, Guard, Hratli, Iron Wolf, Ormus, Tyrael and Warriv rows. None is in the speech table (0x72b0e0), the only way a dialogue string plays a voice, and no client code plays their numbers (where game.exe has them, they're string ids or line numbers: 0xe8d in FUN_004a1950 is a string), so as traced stock 1.14d never plays them. |
-| 2 `monster_diablo_taunt_*` | Diablo's taunts: `monster_diablo_taunt_1` plays at frame 50 of the `diablo` missile (pCltDoFunc 37, FUN_004d6540, the missile's +0x10 current frame), which also shakes the screen at frame 150; d2d makes neither that missile nor screen shake (see `andariel_quake_loop`); `monster_diablo_taunt_ex`, with the screen shake, on event message 0x12, Diablo Walks the Earth (FUN_0049eb10), a realm event no single-player or d2d host sends. |
+| 1 `monster_diablo_taunt_2` | No stock trigger identified. The arrival uses `monster_diablo_taunt_1` (now wired); the realm event 0x12 uses the separate expansion row `monster_diablo_taunt_ex`, outside this base-install count. |
 | 6 monster / skeleton rows | `monster_cast_lightning` (421), `monster_meteor_impact` (437), `skeleton_cast_cold` / `_lightning` / `_poison` (1799..1801) and `monster_izual_taunt_2` (4644). No table column names them (Skills stsound names their siblings `monster_cast_cold` / `_fire`, MonSounds Weapon1 / 2 `skeleton_cast_fire` for every skeleton mage, all four rows being `firemage.wav`) and game.exe has no `mov ecx, <id>` / `push <id>` before a play for them (the 0x1a5 / 0x1b5 / 0x706 / 0x708 immediates are FUN_00477170's monster classes, screen-coordinate compares in FUN_0049a*/0049b*, assert line numbers for FUN_00408090, and a (string, number) record at 0x640d6e). The swing, FUN_004cb6a0, plays Weapon1 / 2 (+0x10 / +0x28) as they are, with no element offset; the taunt, FUN_004cbde0 event 0x10, plays +0x74 Taunt alone (`monster_izual_taunt_1`, Group Size 0). So as traced stock 1.14d never plays them. |
-| 1 `andariel_quake_loop` | The screen shake's sound. FUN_00476a80 (strength, ramp in, hold, fade out in ms) starts a shake; each frame FUN_00476d40 takes its strength along that envelope, moves the camera up to twice it either way, and FUN_004769d0 plays this row unplaced at volume strength x 255 / 10 (at most 255), stopping it at 0. Shakes start from the missiles' pCltDoFunc 29 (andycontrol0), 31 (horadricstaff), 36 (durieldeathcontrol), 37 (diablo), 54 (anya) and 58 (royalstrikechaosice), event message 0x12 and the client skill function 0x727a90[145]; d2d has no screen shake yet. |
 | 1 `scene_tavern_interior` | Front-end tavern scene only; d2d does not implement that scene. |
 
-Of the 106, 97 are traced as never played by stock 1.14d: the 70 class
+Of the 104, 97 are traced as never played by stock 1.14d: the 70 class
 quest phrases, the 8 rogue confirms, the 13 NPC rows and the 6 monster /
-skeleton rows. So d2d plays 3,414 of the 3,423 rows the original does. The
+skeleton rows. So d2d plays 3,416 of the 3,423 rows the original does. The
 five desert-night rows aren't counted with them: no SoundEnviron row names
 them, but no code path playing them has been ruled out.
 
@@ -413,3 +412,39 @@ convert-ready cue remains.
 Player attack modes follow the Skills.txt `anim` token: S3 (the Barbarian's
 Left Hand Swing and the Druid's Rabies / Hunger) and S4 are attack modes too,
 so their attack timing and sound dispatcher run as for A1 / KK / S1.
+
+### Screen shake and quest control missiles
+
+`rules/shake.hpp` implements FUN_00476a80 / FUN_00476d40: a ramp, hold
+and fade in milliseconds; a zero hold leaves the current shake alone.
+Each rendered frame draws two random offsets in [-strength, strength),
+using a client seed apart from gameplay. `Town::draw_view` applies their
+inverse isometric projection to the camera, including the player's sprite.
+FUN_004769d0 starts an unplaced `andariel_quake_loop`, sets its instance
+volume toward min(strength × 255 / 20, 255) by six units per rendered frame,
+and stops the channel at zero. The divisor is **20**, correcting the prior
+note's 10. The dedicated channel follows world pause, duck and cleanup.
+
+Andariel's client death effect (FUN_0046ba50) makes `andycontrol0`, client
+function 29 (FUN_004d5310). At frame 90 it starts strength 8, ramp 2000,
+hold 3000, fade 2000 (stock CltParam2=7 seconds; CltParam1=25 controls fire
+frequency). Diablo's all-seals flag 12 (FUN_005b5230 → FUN_00545760;
+S→C 0x89) calls FUN_0046b290 only in the Chaos Sanctuary: `diablo appears`,
+client function 37 (FUN_004d6540). FUN_0064a380 reads remaining frames: at 50 remaining (elapsed 250,
+10 seconds) it plays `monster_diablo_taunt_1` unplaced; at 150 remaining
+(elapsed 150) it starts strength 25, hold 4000, no ramp or fade.
+Andariel uses FUN_0064a3b0, which reads total minus remaining instead.
+The native view carries these effects once to the client; a stock joined
+host's 0x89 and Andariel dying mode also start them. Local co-op shares one
+screen sequence. Crossing levels clears pending effects, offsets and loop.
+Skipped render ticks process crossed control frames once.
+
+`tools/emu/shake.py` captures the original envelope/mixer and, with
+`--controls`, both missile callbacks. `test_shake` consumes those fixtures.
+The executable SHA-256 is pinned by the oracle. This is instruction-level
+execution under Unicorn with stubbed clock, random offsets, unit lookup and
+audio backend; it does not establish live visual or by-ear parity.
+
+Not done: the control missiles' fire/debris visuals, horadricstaff (31),
+durieldeathcontrol (36), anya center (54), royalstrikechaosice (58), skill
+client function 145 and the Diablo Walks the Earth realm event's shake.

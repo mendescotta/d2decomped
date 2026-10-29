@@ -56,3 +56,7 @@ the command to run first.
 - Anything longer than ~100 lines gets its own folder and a README in
   this shape: what it is, the command to run first, why it exists, more
   uses, when it breaks. Then add its line to the tables above.
+
+`sound_coverage.py MPQ_DIR --build BUILD [--all]` accepts an out-of-tree
+build containing `tools/mpq-cat/mpq-cat`; it checks that binary before
+reading data. The default remains `build`.
