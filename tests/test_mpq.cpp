@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Exercise the MPQ wrapper against real D2 archives if available.
-// Skips (d2d::test::kSkipped) when D2_MPQ_DIR isn't set — the test can't fabricate a
+// Skips (D2D_TEST_SKIPPED) when D2_MPQ_DIR isn't set — the test can't fabricate a
 // real MPQ and we don't want CI without game data to fail.
 //
 // D2_MPQ_DIR must contain at least d2char.mpq; d2data.mpq is a bonus that
@@ -8,7 +8,6 @@
 // setup ("run the launcher, install, run this") work with zero env fuss.
 #include <log.hpp>
 #include <mpq.hpp>
-#include "skip.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -36,7 +35,7 @@ int main() try {
     if (!fs::exists(d2char)) {
         std::printf("SKIP: %s not found (set D2_MPQ_DIR to run)\n",
                     d2char.string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
 
     using namespace d2d::mpq;

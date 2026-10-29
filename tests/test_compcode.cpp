@@ -5,7 +5,6 @@
 #include <compcode.hpp>
 #include <mpq.hpp>
 #include <txt.hpp>
-#include "skip.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -36,7 +35,7 @@ int main() try {
         : fs::path(std::getenv("HOME") ? std::getenv("HOME") : "") / "Workspace/private/diablo2";
     if (!fs::exists(dir / "d2data.mpq")) {
         std::printf("SKIP: %s not found\n", (dir / "d2data.mpq").string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
     d2d::mpq::Stack mpqs;
     if (fs::exists(dir / "d2exp.mpq")) mpqs.push(dir / "d2exp.mpq");

@@ -2,7 +2,6 @@
 // Load the Rogue Encampment (ACT1) palette and sanity-check the shape.
 #include <mpq.hpp>
 #include <palette.hpp>
-#include "skip.hpp"
 
 #include <array>
 #include <cassert>
@@ -25,7 +24,7 @@ int main() try {
     const auto d2data = dir / "d2data.mpq";
     if (!fs::exists(d2data)) {
         std::printf("SKIP: %s not found\n", d2data.string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
 
     d2d::mpq::Archive mpq(d2data);

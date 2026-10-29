@@ -10,13 +10,14 @@ foreach(v CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS
 endforeach()
 
 # A test with no data to run on (no MPQs, ISO or game.exe) exits 77
-# (skip.hpp's kSkipped, sys.exit(77) in the .py tests): ctest lists it as
-# skipped, so a green run says which data-backed checks ran.
+# (D2D_TEST_SKIPPED in the C++ tests, sys.exit(77) in the .py tests): ctest
+# lists it as skipped, so a green run says which data-backed checks ran.
 set(d2d_skip_code 77)
 
 function(d2d_add_test name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE ${ARGN})
+    target_compile_definitions(${name} PRIVATE D2D_TEST_SKIPPED=${d2d_skip_code})
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE ${d2d_skip_code})
 endfunction()

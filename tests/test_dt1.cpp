@@ -2,7 +2,6 @@
 // Parse a real DT1 from d2data.mpq and verify structure + decoded pixels.
 #include <dt1.hpp>
 #include <mpq.hpp>
-#include "skip.hpp"
 
 #include <cassert>
 #include <cstdio>
@@ -20,7 +19,7 @@ int main() try {
     const auto d2data = dir / "d2data.mpq";
     if (!fs::exists(d2data)) {
         std::printf("SKIP: %s not found\n", d2data.string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
 
     d2d::mpq::Archive mpq(d2data);

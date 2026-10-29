@@ -2,7 +2,6 @@
 // Parse a real Rogue-Encampment DS1 and sanity-check the grid + file refs.
 #include <ds1.hpp>
 #include <mpq.hpp>
-#include "skip.hpp"
 
 #include <cassert>
 #include <cstdio>
@@ -21,7 +20,7 @@ int main() try {
     const auto d2data = dir / "d2data.mpq";
     if (!fs::exists(d2data)) {
         std::printf("SKIP: %s not found\n", d2data.string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
 
     d2d::mpq::Archive mpq(d2data);

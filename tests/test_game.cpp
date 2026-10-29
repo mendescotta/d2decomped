@@ -32,7 +32,6 @@
 #include <sound_ids.hpp>
 #include <uniques.hpp>
 #include <world.hpp>
-#include "skip.hpp"
 
 #include <algorithm>
 #include <array>
@@ -134,7 +133,7 @@ int main(int argc, char** argv) try {
         assert(crushing_blow(1000, 4, 0) == 250 && crushing_blow(1000, 4, 60) == 100 && crushing_blow(1000, 4, 150) == 0 && crushing_blow(1000, 4, -100) == 250);
         std::printf("OK: MonProp IAS / FCR rates, knock and crush rolls\n");
     }
-    if (!fs::exists(data_dir / "d2data.mpq")) { std::printf("SKIP: no d2data.mpq in %s (the checks above ran)\n", data_dir.string().c_str()); return d2d::test::kSkipped; }
+    if (!fs::exists(data_dir / "d2data.mpq")) { std::printf("SKIP: no d2data.mpq in %s (the checks above ran)\n", data_dir.string().c_str()); return D2D_TEST_SKIPPED; }
     const char* patch = std::getenv("D2_PATCH_INSTALLER");
 
     auto data = load_game_data(data_dir, patch ? fs::path(patch) : fs::path{}, 0x1234);

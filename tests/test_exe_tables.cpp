@@ -3,10 +3,9 @@
 // against the real game.exe (1.14.3.71). The tables stay in the code; this
 // only reads the exe at test time. game.exe: $D2_GAME_EXE, else
 // $D2_MPQ_DIR/bin/game.exe, else ~/Workspace/private/diablo2/bin/game.exe;
-// none (or another version) prints "skip" and passes.
+// none (or another version) prints "SKIP: ..." and returns D2D_TEST_SKIPPED.
 // RULE: every table copied from game.exe gets an entry in kTables below.
 #include <install.hpp>
-#include "skip.hpp"
 
 #include <compcode.hpp>
 #include <drlg.hpp>
@@ -451,10 +450,10 @@ fs::path find_exe() {
 
 int main() {
     const fs::path path = find_exe();
-    if (path.empty() || !fs::is_regular_file(path)) { std::printf("SKIP: no game.exe (set D2_GAME_EXE)\n"); return d2d::test::kSkipped; }
+    if (path.empty() || !fs::is_regular_file(path)) { std::printf("SKIP: no game.exe (set D2_GAME_EXE)\n"); return D2D_TEST_SKIPPED; }
     if (d2d::install::file_version(path) != std::array<std::uint16_t, 4>{ 1, 14, 3, 71 }) {
         std::printf("SKIP: %s is not 1.14.3.71\n", path.string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
     const Exe exe(path);
     for (const auto& table : kTables) {

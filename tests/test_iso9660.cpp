@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Smoke test for iso9660::Reader. Points at ~/Downloads/Diablo II + LoD/1.
-// INSTALL DISC.ISO when it exists; otherwise reports skipped and passes.
+// INSTALL DISC.ISO when it exists; otherwise prints "SKIP: ..." and returns
+// D2D_TEST_SKIPPED.
 // ponytail: one runnable check that fails loudly if the reader breaks. No
 // framework, no fixtures.
 
 #include <iso9660.hpp>
-#include "skip.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -19,13 +19,13 @@
 int main() {
     namespace fs = std::filesystem;
     const char* home = std::getenv("HOME");
-    if (!home) { std::puts("SKIP: no HOME"); return d2d::test::kSkipped; }
+    if (!home) { std::puts("SKIP: no HOME"); return D2D_TEST_SKIPPED; }
 
     const fs::path iso = fs::path(home) / "Downloads"
         / "Diablo II + LoD" / "1. INSTALL DISC.ISO";
     if (!fs::exists(iso)) {
         std::printf("SKIP: %s not found\n", iso.string().c_str());
-        return d2d::test::kSkipped;
+        return D2D_TEST_SKIPPED;
     }
 
     auto reader = iso9660::Reader::open(iso);
