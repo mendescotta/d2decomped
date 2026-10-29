@@ -480,8 +480,14 @@ auto Town::send(const Command& command) -> void {
             const bool melee = skill && !self_cast(*skill) && !world.fight.missile_skill(*skill) && !Fight::spot_skill(*skill) && !world.fight.summon_skill(*skill);
             const auto target = use->unit >= 0 ? net_monsters.find(std::uint32_t(use->unit)) : net_monsters.end();
             std::uint32_t item = 0xffffffff;                // a charged entry's item, as the host knows it
-            if (const auto local = std::ranges::find(character.items, use->item, &d2d::d2s::Item::id); use->item >= 0 && local != character.items.end())
-                if (const auto host = net_game->host_item(*local); host != 0) item = host;
+            if (use->item >= 0) {
+                // No host id for it: nothing sent, or the host would cast the character's own
+                // skill of that id, at its own level and for mana.
+                const auto local = std::ranges::find(character.items, use->item, &d2d::d2s::Item::id);
+                if (local == character.items.end()) return;
+                item = net_game->host_item(*local);
+                if (item == 0) return;
+            }
             if (target != net_monsters.end()) {
                 // The host drops a skill that comes mid-swing (FUN_0057edd0:
                 // modes A1 / A2 / SC / TH take one only once FUN_0057ed70 says
@@ -503,6 +509,11 @@ auto Town::send(const Command& command) -> void {
             }
             net_attack = -1;
             net_game->skill_at(use->skill, use->left, subtile_x(use->x), subtile_y(use->y), item);
+            // At the ground nothing is cast here, so the charge is spent here (the monster path's
+            // local UseSkill spends it): the shown count drops and the picker drops the entry at 0.
+            if (use->item >= 0)
+                for (const auto& entry : d2d::game::charged_skills(hero.character.items))
+                    if (entry.item == use->item && entry.skill == use->skill) { (void)d2d::game::use_charge(hero.character.items, entry); break; }
         } else if (const auto* pickup = std::get_if<cmd::Pickup>(&command)) {
             // A host item: the host takes it only within 5 subtiles and doesn't
             // walk us up for it (FUN_00548b00 case 4), so we walk there, it
