@@ -20,6 +20,7 @@
 #include <ios>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -36,13 +37,23 @@ int main(int argc, char** argv) try {
     const std::filesystem::path dir = argv[1];
     d2d::mpq::Stack mpqs;
     const char* installer = std::getenv("D2_PATCH_INSTALLER");
+    std::error_code filesystem_error;
     if (!patch_out.empty()) {   // the installer's data, never the install's own patch_d2.mpq (maybe 1.13c's)
         if (!installer) { std::fprintf(stderr, "mpq-cat: -p needs $D2_PATCH_INSTALLER\n"); return 2; }
         mpqs.push_installer(installer);
-    } else if (std::filesystem::exists(dir / "patch_d2.mpq")) mpqs.push(dir / "patch_d2.mpq");
-    else if (installer) mpqs.push_installer(installer);
-    for (const char* name : { "d2exp.mpq", "d2data.mpq", "d2char.mpq", "d2xtalk.mpq", "d2speech.mpq", "d2sfx.mpq", "d2xmusic.mpq", "d2music.mpq" })
-        if (std::filesystem::exists(dir / name)) mpqs.push(dir / name);
+    } else {
+        const auto patch = dir / "patch_d2.mpq";
+        const bool has_patch = std::filesystem::exists(patch, filesystem_error);
+        if (filesystem_error) { std::fprintf(stderr, "mpq-cat: cannot check %s: %s\n", patch.c_str(), filesystem_error.message().c_str()); return 1; }
+        if (has_patch) mpqs.push(patch);
+        else if (installer) mpqs.push_installer(installer);
+    }
+    for (const char* name : { "d2exp.mpq", "d2data.mpq", "d2char.mpq", "d2xtalk.mpq", "d2speech.mpq", "d2sfx.mpq", "d2xmusic.mpq", "d2music.mpq" }) {
+        const auto path = dir / name;
+        filesystem_error.clear();
+        if (std::filesystem::exists(path, filesystem_error)) mpqs.push(path);
+        else if (filesystem_error) { std::fprintf(stderr, "mpq-cat: cannot check %s: %s\n", path.c_str(), filesystem_error.message().c_str()); return 1; }
+    }
     if (!patch_out.empty()) {
         const auto list = d2d::mpq::Archive(installer).read("patch.lst");
         std::string_view all(reinterpret_cast<const char*>(list.data()), list.size());
