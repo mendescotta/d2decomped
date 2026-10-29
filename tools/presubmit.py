@@ -45,6 +45,12 @@ def git(tree, *args):
     return subprocess.run(["git", "-C", str(tree), *args], capture_output=True, text=True, check=True).stdout
 
 
+
+def tool_tests(tree):
+    """The tracked tools/**/test_*.py: an untracked tools/emu/.venv's tests aren't ours."""
+    return sorted(path for path in git(tree, "ls-files", "tools").splitlines()
+                  if path.endswith(".py") and Path(path).name.startswith("test_"))
+
 def added_lines(tree, base):
     """{path: {line numbers added}} and {path: [(line, text)]} from the branch's diff."""
     numbers, texts, path, line = {}, {}, None, 0
@@ -154,7 +160,7 @@ def check_python(tree, changed, numbers):
            f"{len(scripts)} files ({len(found) - len(mine)} on lines this branch didn't add)")
     for text in soft:
         report("WARN", "ruff", text)
-    tests = sorted(str(path.relative_to(tree)) for path in (tree / "tools").rglob("test_*.py"))
+    tests = tool_tests(tree)
     if any(path.startswith("tools/") for path in scripts):
         # Twice: as is, and with TMPDIR behind a symlink as macOS's /var -> /private/var
         # (#91: abspath against a resolved getcwd() picked every TU on the macOS leg)
@@ -431,7 +437,10 @@ def check_review(tree, base, changed, texts):
                 field = STATE.match(text)
                 if field and "(" not in text and "static" not in text and "constexpr" not in text:
                     name = field.group(1)
-                    resets = git(tree, "grep", "-n", "-w", name, "--", "components", "apps").count("\n")
+                    # git grep exits 1 on no match (a field in tests/ or tools/ only)
+                    grep = subprocess.run(["git", "-C", str(tree), "grep", "-n", "-w", name, "--", "components", "apps"],
+                                          capture_output=True, text=True, check=False)
+                    resets = grep.stdout.count("\n")
                     if resets <= 2:
                         report("WARN", "new-state", f"{path}:{num}: `{name}` is new; reset on new game / leave / "
                                                     f"co-op end / load? ({resets} mentions in the tree)")

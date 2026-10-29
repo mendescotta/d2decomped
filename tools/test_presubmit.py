@@ -118,6 +118,29 @@ class PresubmitTests(unittest.TestCase):
         self.assertFalse([message for level, name, message in presubmit.results
                           if name == "siblings" and message.startswith("unit kinds")])
 
+    def test_new_state_outside_the_game_tree_is_no_crash(self):
+        # #101 (CodeRabbit): git grep exits 1 on no match, so a field only in tests/ raised
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            git(root, "init", "-q")
+            (root / "tests").mkdir()
+            (root / "tests" / "fake.hpp").write_text("struct Fake {\n    int lonely_field = 0;\n};\n")
+            git(root, "add", "-A")
+            presubmit.check_review(root, "main", ["tests/fake.hpp"], {"tests/fake.hpp": [(2, "    int lonely_field = 0;")]})
+        self.assertTrue(any(name == "new-state" and "(0 mentions in the tree)" in message
+                            for _, name, message in presubmit.results), presubmit.results)
+
+    def test_tool_tests_are_the_tracked_ones(self):
+        # #101 (CodeRabbit): rglob also found tests under an untracked tools/emu/.venv
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            git(root, "init", "-q")
+            (root / "tools" / "emu" / ".venv").mkdir(parents=True)
+            (root / "tools" / "test_mine.py").write_text("")
+            (root / "tools" / "emu" / ".venv" / "test_dep.py").write_text("")
+            git(root, "add", "tools/test_mine.py")
+            self.assertEqual(presubmit.tool_tests(root), ["tools/test_mine.py"])
+
     def test_ctest_skipped_is_not_failed(self):
         with tempfile.TemporaryDirectory() as tmp:
             build = Path(tmp)
