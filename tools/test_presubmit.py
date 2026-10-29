@@ -46,6 +46,27 @@ class PresubmitTests(unittest.TestCase):
         self.assertEqual(names("    for (int ab = 0; ab < 3; ++ab)"), [None])
         self.assertEqual(names("    for (auto& c : list)"), ["c"])
 
+    def test_short_names_parameters_and_catch(self):
+        # #101: .clang-tidy's MinimumParameterNameLength / MinimumExceptionNameLength 3;
+        # IgnoredParameterNames has no `ok`, IgnoredExceptionVariableNames is tidy's ^[e]$
+        def names(text):
+            return [name for hit in presubmit.SHORT_NAME.finditer(text) if (name := presubmit.short_name(text, hit))]
+        self.assertEqual(names("void f(int ab, float c);"), ["ab", "c"])
+        self.assertEqual(names("std::sort(v.begin(), v.end(), [](const Unit& a, const Unit& b) { return a.x < b.x; });"),
+                         ["a", "b"])
+        self.assertEqual(names("    } catch (const std::exception& ex) {"), ["ex"])
+        self.assertEqual(names("    } catch (const std::exception& e) {"), [])
+        self.assertEqual(names("void f(int x, float dy, bool ok);"), ["ok"])
+        self.assertEqual(names("void f(int count, const Unit& unit);"), [])
+        self.assertEqual(names("    std::function<void(int, int)> done;"), [])
+
+    def test_build_volume_per_worktree_path(self):
+        # #101: two worktrees whose folders share a name get their own volume
+        first, second = presubmit.build_volume("/a/d2d"), presubmit.build_volume("/b/d2d")
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.startswith("d2d-build-linux-d2d-") and second.startswith("d2d-build-linux-d2d-"))
+        self.assertEqual(first, presubmit.build_volume("/a/d2d"))
+
     def test_trap_handler_must_exit_in_its_own_body(self):
         # #101: a greedy match ran to the file's last `}`, so a later `exit` passed a handler that never exits
         with tempfile.TemporaryDirectory() as directory:

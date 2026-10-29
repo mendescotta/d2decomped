@@ -22,6 +22,7 @@ Data tests run when D2_MPQ_DIR (and D2_PATCH_INSTALLER) are set, as in CI.
 """
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import os
 import re
@@ -177,7 +178,10 @@ def check_python(tree, changed, numbers):
 def wait_for_other_builds(limit_s=1800):
     """One build at a time: two at once on a 15 GB machine got cc1plus
     OOM-killed. Wait while a compiler or clang-tidy runs, a docker build's
-    (root's) too; not `ld`, which any project's link matches."""
+    (root's) too; not `ld`, which any project's link matches. Linux only:
+    Apple's compiler runs as clang / clang++, not cc1plus, and Docker
+    Desktop's builds run in its VM, out of the host's pgrep, so on macOS
+    this never waits."""
     import time
     waited = 0
     while shutil.which("pgrep"):
@@ -231,17 +235,30 @@ def docker_command(command):
 # CI's readability-identifier-length (.clang-tidy): 3+ letters, except these.
 # A fast stand-in that runs in --quick too (#93's test `at`, #92's `c`).
 SHORT_NAME = re.compile(r"(?:\b(?:auto|int|float|bool|double|std::\w+(?:<[^;={}()]*>)?|std::size_t|unsigned|char)(?:\b|(?<=>))[&*\s]+|\bconst\s+\w+[&*\s]+)"
-                        r"([A-Za-z_]\w?)\s*(?:=|\{|;|:(?!:))")
+                        r"([A-Za-z_]\w?)\s*(?:=|\{|;|:(?!:)|,|\))")
 SHORT_OK = re.compile(r"^(x|y|dx|dy|id|ok)$")             # IgnoredVariableNames
+PARAM_OK = re.compile(r"^(x|y|dx|dy|id)$")                # IgnoredParameterNames: no `ok`
+CATCH_OK = re.compile(r"^e$")                             # IgnoredExceptionVariableNames (tidy's default, ^[e]$)
 LOOP_OK = re.compile(r"^([ijkxy]|\w\w)$")                 # a for-init counter: IgnoredLoopCounterNames, or 2+ letters
-FOR_INIT = re.compile(r"\bfor\s*\(\s*$")
+FOR_INIT = re.compile(r"\bfor\s*\(\s*(?:const\s+)?$")
+CATCH = re.compile(r"\bcatch\s*\(\s*(?:const\s+)?$")
 
 
 def short_name(code, hit):
-    """The name if CI's tidy would flag it: a for-init counter by the loop rules, the rest as variables."""
+    """The name if CI's tidy would flag it: a for-init counter by the loop rules, a catch's
+    variable by the exception rules, a name followed by `,` or `)` (a function's or a
+    lambda's parameter) by the parameter rules, the rest as variables."""
     name = hit.group(1)
-    counter = FOR_INIT.search(code[:hit.start()]) and not code[hit.end(1):].lstrip().startswith(":")
-    return None if (LOOP_OK if counter else SHORT_OK).match(name) else name
+    before, after = code[:hit.start()], code[hit.end(1):].lstrip()
+    if CATCH.search(before):
+        rule = CATCH_OK
+    elif FOR_INIT.search(before) and not after.startswith(":"):
+        rule = LOOP_OK
+    elif after.startswith((",", ")")):
+        rule = PARAM_OK
+    else:
+        rule = SHORT_OK
+    return None if rule.match(name) else name
 
 
 def check_short_names(texts):
@@ -255,6 +272,13 @@ def check_short_names(texts):
                 if name := short_name(code, hit):
                     hits.append(f"{path}:{line}: '{name}' is shorter than 3 letters (readability-identifier-length)")
     report("FAIL" if hits else "ok", "short-names", "\n      ".join(hits[:15]) if hits else "no 1-2 letter names added")
+
+
+def build_volume(tree):
+    """validate-linux.sh's build volume for worktree `tree`: d2d-build-linux-<folder>-<path hash>."""
+    path = str(Path(tree).resolve())
+    return "d2d-build-linux-" + re.sub(r"[^a-z0-9_.-]+", "-", Path(path).name.lower()) + "-" + \
+        hashlib.sha1(path.encode()).hexdigest()[:8]
 
 
 def check_cpp(tree, changed, numbers, build, quick, docker):
@@ -273,8 +297,9 @@ def check_cpp(tree, changed, numbers, build, quick, docker):
                "D2D_DOCKER_MEMORY": os.environ.get("D2D_DOCKER_MEMORY", f"{cap}g"),
                # a build volume per worktree: they all mount at /src, so with one shared volume
                # ninja takes another branch's newer objects as up to date (a link then misses
-               # a function the branch added)
-               "D2D_BUILD_VOLUME": os.environ.get("D2D_BUILD_VOLUME", "d2d-build-linux-" + re.sub(r"[^a-z0-9_.-]+", "-", tree.name.lower()))}
+               # a function the branch added); the folder's name and a hash of its full path, so
+               # a/d2d and b/d2d don't share one (tools/README.md: listing and removing them)
+               "D2D_BUILD_VOLUME": os.environ.get("D2D_BUILD_VOLUME", build_volume(tree))}
         run = subprocess.run(docker_command([str(tree / "tools/validate-linux.sh")]), cwd=tree, env=env, check=False)
         report("FAIL" if run.returncode else "ok", "validate-linux", f"exit {run.returncode}")
         return run.returncode == 0
