@@ -87,6 +87,7 @@ int main(int argc, char** argv) try {
     }
     {
         GameData empty_data;
+        empty_data.monsters.types.emplace_back();
         View sent;
         sent.level = &empty_data.town;
         sent.quest_log.back() = 9;
@@ -94,6 +95,8 @@ int main(int argc, char** argv) try {
         sent.events = { ev::Reassigned{}, ev::Lightning{} };
         sent.party_pets.push_back({ Npc{}, UnitState{}, "WL", "hireable", 100 });   // a partner's merc (local co-op)
         Monster monster;
+        monster.id = 1;
+        monster.type = 0;
         monster.anim_pct = 25;
         monster.props.ias = 60;
         monster.props.fcr = 40;
