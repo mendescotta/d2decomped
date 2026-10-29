@@ -15,8 +15,8 @@ and its summary shows which data-backed tests didn't run. A test that
 skips only part of its checks (test_d2s's real saves, test_mpq's
 installer) prints a `SKIP` line for that part and still passes. The one
 exception is test_game: it runs its few data-free checks, then returns
-`D2D_TEST_SKIPPED` without d2data.mpq, since nearly all of it is the
-data-backed game; `ctest -V` shows its "the checks above ran" line.
+`D2D_TEST_SKIPPED` without d2data.mpq, since the rest of it runs on the game's
+data; `ctest -V` shows its "the checks above ran" line.
 
 Run: `ctest --test-dir build --output-on-failure`.
 
