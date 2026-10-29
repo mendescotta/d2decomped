@@ -969,7 +969,10 @@ auto Fight::strike(std::uint32_t now_ms) -> void {
 auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         if (actor->attack_mon < 0) return;
         auto& target_monster = monsters[std::size_t(actor->attack_mon)];
-        if (!target_monster.targetable() || std::hypot(target_monster.unit.x - actor->player.x, target_monster.unit.y - actor->player.y) > reach) return;
+        // Converted while the swing was on: no foe of the player's side (FUN_00554200, as land),
+        // so no blow, and no charge, Frenzy or wear off it.
+        if (!target_monster.targetable() || target_monster.align == 2
+            || std::hypot(target_monster.unit.x - actor->player.x, target_monster.unit.y - actor->player.y) > reach) return;
         auto current_swing = swing();
         auto fighter = current_swing.kick ? actor->pf_kick : actor->player_combat;
         const auto* skill = game_data->skills.get(actor->swing_skill);
@@ -4343,7 +4346,8 @@ auto Fight::next_target() -> bool {
 auto Fight::in_reach() const -> std::vector<int> {
         std::vector<int> out;
         for (std::size_t i = 0; i < monsters.size(); ++i)
-            if (monsters[i].targetable() && std::hypot(monsters[i].unit.x - actor->player.x, monsters[i].unit.y - actor->player.y) <= kMeleeReach + 0.5f)
+            if (monsters[i].targetable() && monsters[i].align != 2   // a converted one is no foe (FUN_00554200)
+                && std::hypot(monsters[i].unit.x - actor->player.x, monsters[i].unit.y - actor->player.y) <= kMeleeReach + 0.5f)
                 out.push_back(int(i));
         return out;
     }
