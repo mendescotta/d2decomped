@@ -188,8 +188,9 @@ void view_units(const Scene& scene, const View& view, float camera_x, float came
         const bool down = monster.buried, row = !down && monster.seq_frame >= 0;   // a sequence: its row's mode and frame
         const auto& anim = scene.npc_anim(monster.npc, down ? std::string_view("S1") : row ? monster.seq_mode : std::string_view(monster.mode));
         const auto mpf = anim.ms_per_frame();
-        // No name, so no hover, for a converted one: game.exe's HitTestScreen drops an ally it can't
-        // interact with (CanInteractWith), and a click there walks.
+        // No name, so no hover, for a converted one, and a click there walks.
+        // unverified (source: redivivus D2Client/UNIT/CUnit.cpp HitTestScreen): the cursor drops a unit
+        // CanInteractWith refuses (!IsAllyOf for a monster, an NPC let through); not found in 1.14d yet.
         const bool selectable = monster.targetable() && !monster.ally_not_interact(scene);
         out.push_back({ monster.unit.x, monster.unit.y, &anim, monster.unit.dir, selectable ? &monster.npc.name : nullptr,
                         row ? now_ms - mpf * std::uint32_t(monster.seq_frame) - mpf / 2 : down && monster.mode != "S1" ? 0u : monster.unit.mode_ms, -10 - int(i) });

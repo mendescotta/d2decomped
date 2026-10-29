@@ -27,6 +27,7 @@ trust. `git grep -n "unverified (source"` lists them.
 | Packet names | docs/research/re/network.md | the community's (d2-clientless, D2MOO) | handlers marked ✓ were read | names only; behaviour is from the handlers |
 | Charsi's Imbue pick: after the menu, the next item click takes the item up and imbues it | apps/d2d/town.cpp `imbue_with` | the identify pick's pattern | 0x4b35b0 opens the inventory in UI mode 7; the server imbues the cursor item (act1-end.md) | the panel's click path, 0x4c0620 / 0x4c01e0 |
 | Throw has level 1 only while a throwable is held (the picker offers it then) | components/game/fight.hpp `skill_base_level` | the D2 picker's look | every player has Throw (Skills.txt general); `FUN_004d9fc0` greys what the weapon can't use | `FUN_004d9fc0`, the start skills a new character gets |
+| A converted monster (align 2, no MonStats interact) gets no hover and no pick: the cursor walks there, a held attack drops it | components/game/ai.hpp `ally_not_interact`, apps/d2d/town.cpp `view_units`, components/game/world.cpp `apply` (UseSkill) | redivivus D2Client/UNIT/CUnit.cpp `HitTestScreen` / `CanInteractWith` (!IsAllyOf for a monster) | the server side is traced: FUN_00554200 makes a converted monster no foe (fight.cpp `land`) | game.exe's client hit test and the interact check it calls |
 
 ## Traced
 

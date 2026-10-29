@@ -2576,8 +2576,9 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
         const auto& use_skill = std::get<cmd::UseSkill>(command);
         const auto* skill = game_data->skills.get(use_skill.skill);
         const int monster_index = fight.monster_index(use_skill.unit);
-        // A converted monster is the player's side: game.exe's cursor never picks it (HitTestScreen
-        // drops what CanInteractWith refuses, an ally by IsAllyOf), so no attack.
+        // A converted monster is the player's side: the cursor never picks it, so no attack.
+        // unverified (source: redivivus D2Client/UNIT/CUnit.cpp HitTestScreen): it drops what
+        // CanInteractWith refuses, an ally by IsAllyOf; not found in 1.14d yet.
         const auto* target = monster_index >= 0 ? &fight.monsters[std::size_t(monster_index)] : nullptr;
         const bool live = target && target->targetable() && !target->ally_not_interact(*game_data);
         if (skill && !skill->in_town && !in_moor) {
