@@ -678,6 +678,10 @@ int main(int argc, char** argv) try {
             assert(caster.item_charge == (ChargedSkill{ 9001, fire_bolt, 4, 2 - cast, 2 }) && world.fight.skill_level(fire_bolt) == 4);
             assert(world.fight.cast_missile(fire_bolt, aim_x, aim_y, cast_ms));
             assert(caster.character.stats.values[d2d::d2s::kMana] == mana);
+            // The cast's over: the entry's level goes with it (the panel and auras read the character's).
+            assert(caster.pmode >= 0);
+            world.fight.player_modes(false, caster.pmode_until, 0.f);
+            assert(caster.pmode == -1 && caster.item_charge.item == -1 && world.fight.skill_level(fire_bolt) == 0);
         }
         assert(caster.character.items[saved_items.size()].props[0].value == (2 << 8 | 0) && charged_skills(caster.character.items).empty());
         caster.pmode = -1;

@@ -2296,6 +2296,7 @@ auto Fight::player_modes(bool held, std::uint32_t now_ms, float elapsed) -> bool
                 actor->smove = {};
                 actor->seq_loop = false;
                 actor->pmode = -1; actor->player.mode_ms = now_ms;
+                actor->item_charge = {};                            // the swing's over: skill_level is the character's again
                 if (!held) actor->attack_mon = -1;
             }
         } else if (actor->pmode == kModeSC) {                       // a self cast: its state on the action frame
@@ -2314,7 +2315,7 @@ auto Fight::player_modes(bool held, std::uint32_t now_ms, float elapsed) -> bool
                     start_state(*skill, skill_level ? skill_level(skill->id) : 1, now_ms);
                 }
             }
-            if (now_ms >= actor->pmode_until) { actor->pmode = -1; actor->player.mode_ms = now_ms; if (!held) actor->attack_mon = -1; }
+            if (now_ms >= actor->pmode_until) { actor->pmode = -1; actor->player.mode_ms = now_ms; actor->item_charge = {}; if (!held) actor->attack_mon = -1; }
         } else if ((actor->pmode == kModeGH || actor->pmode == kModeBL) && now_ms >= actor->pmode_until) {
             actor->pmode = -1; actor->player.mode_ms = now_ms;
         }
