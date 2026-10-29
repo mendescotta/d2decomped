@@ -74,6 +74,12 @@ def state():
     return dict(re.findall(r"(\w+)=(.*?)(?= \w+=|$)", cmd("state").split("\n")[0]))
 
 
+def quake_on():
+    """The real quest event reached the client envelope and OpenAL loop."""
+    power, dx, dy, sound, volume = map(int, state()['quake'].split(','))
+    return power > 0 and -power <= dx < power and -power <= dy < power and sound == 452 and volume > 0
+
+
 def bits(quest):
     return int(cmd(f"debug quest {quest} show").split("bits=")[1].split()[0], 16)
 
@@ -355,7 +361,9 @@ def act1():
     assert bits(6) & 0x4, f"Cain didn't give quest 6: {cmd('debug quest 6 show')}"
     go(37)
     until("Andariel's death counts", lambda: bits(6) & 0x2, 30)
+    until("Andariel's quake reaches the camera and loop", quake_on, 10)
     go(2)                                               # the Blood Moor cleared: within the act it stays so
+    assert state()['quake'] == '0,0,0,0,0', 'level change left a quake playing'
     time.sleep(1)
     assert not alive(), f"the Blood Moor wasn't cleared: {len(alive())} left"
     go(1)
@@ -762,6 +770,8 @@ def act4():
     diablo = [l.split("\t") for l in cmd("monsters").splitlines() if l.startswith("diablo\t")][0]
     cmd(f"debug warp {int(float(diablo[1]))} {int(float(diablo[2])) + 3}"); time.sleep(1)
     kill_until("Diablo dead", lambda: "Diablo is dead" in log_text())
+    until("Diablo arrival's quake reaches the camera and loop", quake_on, 10)
+    until("Diablo arrival's remaining-frame taunt", lambda: any(row.split(':')[0] == '4638' for row in state()['sfx'].split(',')), 10)
     assert bits(0x1a) & 0x2001 == 0x2001, f"word 0x1a: {bits(0x1a):#x}"
     go(103)
     talk_until("Tyrael", lambda: bits(0x1a) & 0x200, "Tyrael's portal not given")

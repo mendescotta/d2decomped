@@ -329,6 +329,7 @@ inline std::vector<std::uint8_t> encode_view(const GameData& game_data, const Vi
         else if (const auto* music = std::get_if<ev::MusicCue>(&event)) out.u8(4).i32(music->sound);
         else if (std::holds_alternative<ev::Reassigned>(event)) out.u8(5);
         else if (std::holds_alternative<ev::Lightning>(event)) out.u8(6);
+        else if (const auto* quake = std::get_if<ev::QuestQuake>(&event)) out.u8(7).u8(int(quake->kind));
         else {
             const auto& open_ui = std::get<ev::OpenUI>(event);
             out.u8(1).u8(int(open_ui.kind)).i32(open_ui.npc).u16(int(open_ui.quest.size()));
@@ -551,6 +552,10 @@ inline bool apply_view(const GameData& game_data, std::span<const std::uint8_t> 
             view.events.push_back(ev::Reassigned{});
         } else if (kind_byte == 6) {
             view.events.push_back(ev::Lightning{});
+        } else if (kind_byte == 7) {
+            const auto kind = byte();
+            if (kind > d2d::rules::QuestQuake::diablo) return false;
+            view.events.push_back(ev::QuestQuake{ d2d::rules::QuestQuake::Kind(kind) });
         } else {
             const auto kind = ev::OpenUI::Kind(byte());
             ev::OpenUI open_ui{ kind, i32() };

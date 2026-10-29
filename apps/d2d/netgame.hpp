@@ -12,6 +12,7 @@
 #include <join.hpp>
 #include <net_log.hpp>
 #include <quests.hpp>
+#include <shake.hpp>
 #include <tcp.hpp>
 
 #include <array>
@@ -199,6 +200,7 @@ struct NetGame {
     struct Phrase { int cls = 0, phrase = 0; };   // another player's Say (0x2c)
     std::vector<Phrase> phrases;
     int movie = -1;                            // the cinematic the host asked for (0x61), -1 none
+    std::vector<d2d::rules::QuestQuake::Kind> quest_quakes;
     std::vector<int> quest_news;               // quests (words) whose log state the host sent (0x5d, no flags): the Quest Log button
     // The quest log as the host has it: each quest's log state by its word
     // (0x52 whole, 0x5d one), the game's quest words (0x29), the Den's

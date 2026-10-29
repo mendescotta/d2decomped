@@ -10,6 +10,7 @@
 #include <rules.hpp>
 #include <sound_mix.hpp>
 #include <sound_start.hpp>
+#include <shake.hpp>
 
 #include <algorithm>
 #include <array>
@@ -80,7 +81,8 @@ struct Audio {
     bool ok = false;
     ALCdevice* dev = nullptr;
     ALCcontext* ctx = nullptr;
-    Channel voice, music, ambience, ui_sounds, rain;
+    Channel voice, music, ambience, ui_sounds, rain, quake_loop;
+    int quake_level = 0;
     std::array<Channel, 32> sfx;                 // world sounds: a free one, else the oldest reused
     std::size_t sfx_next = 0;
     Channel music_old;                           // the previous song, fading out under `music`
@@ -142,7 +144,7 @@ struct Audio {
     }
     ~Audio() {
         video_stop();
-        for (auto* channel : { &voice, &music, &music_old, &ambience, &ambience_old, &ui_sounds, &rain }) stop(*channel);
+        for (auto* channel : { &voice, &music, &music_old, &ambience, &ambience_old, &ui_sounds, &rain, &quake_loop }) stop(*channel);
         for (auto& channel : sfx) stop(channel);
         if (music_job.valid()) music_job.wait();
         alcMakeContextCurrent(nullptr);
@@ -337,9 +339,26 @@ struct Audio {
         }
     }
     // Leaving the game: every world sound, the level's ambience and the rain.
+    void stop_quake() { stop(quake_loop); quake_level = 0; }
+    // FUN_004769d0 owns a separate, unplaced loop whose instance volume
+    // moves six units per rendered frame toward the shake envelope.
+    void quake(const GameData& game_data, int strength) {
+        if (!ok) return;
+        const int volume = d2d::rules::quake_volume(quake_level, strength);
+        if (volume == 0) { stop_quake(); return; }
+        if (!quake_loop.src) {
+            const auto found = game_data.sound_index.find("andariel_quake_loop");
+            if (found == game_data.sound_index.end()) return;
+            play(quake_loop, game_data, found->second);
+            if (!quake_loop.src) return;
+        }
+        quake_level = volume;
+        set_gain(quake_loop, float(volume) / 255.f);
+    }
     void stop_world() {
+        stop_quake();
         for (auto& channel : sfx) stop(channel);
-        for (auto* channel : { &ambience, &ambience_old, &rain }) stop(*channel);
+        for (auto* channel : { &ambience, &ambience_old, &rain, &quake_loop }) stop(*channel);
         world_paused = false;
         menu_paused = false;                     // left from the game menu: step_ducks fades back up
     }
@@ -349,7 +368,7 @@ struct Audio {
     void pause_world(bool paused) {
         if (paused == world_paused || !ok) return;
         world_paused = paused;
-        for (auto* channel : { &ambience, &ambience_old, &rain }) if (channel->src) (paused ? alSourcePause : alSourcePlay)(channel->src);
+        for (auto* channel : { &ambience, &ambience_old, &rain, &quake_loop }) if (channel->src) (paused ? alSourcePause : alSourcePlay)(channel->src);
         for (auto& channel : sfx) {
             if (!channel.src) continue;
             ALint state = AL_STOPPED;
@@ -641,7 +660,7 @@ struct Audio {
             if (channel.placed) (void)apply_mix(channel, channel.screen_x, channel.screen_y2);
             else set_gain(channel, channel.gain);
         }
-        for (auto* channel : { &voice, &ui_sounds, &ambience, &ambience_old, &rain, &music, &music_old }) set_gain(*channel, channel->gain);
+        for (auto* channel : { &voice, &ui_sounds, &ambience, &ambience_old, &rain, &quake_loop, &music, &music_old }) set_gain(*channel, channel->gain);
     }
     // Land a finished music job; free one-shots that have played out.
     void update() {
@@ -677,7 +696,7 @@ struct Audio {
             if (channel == &music_old) stop(music_old);
             if (channel == &ambience_old) stop(ambience_old);
         }
-        for (auto* channel : { &voice, &ui_sounds, &ambience, &rain, &music, &music_old }) {
+        for (auto* channel : { &voice, &ui_sounds, &ambience, &rain, &quake_loop, &music, &music_old }) {
             if (!channel->src) continue;
             ALint state = 0;
             alGetSourcei(channel->src, AL_SOURCE_STATE, &state);

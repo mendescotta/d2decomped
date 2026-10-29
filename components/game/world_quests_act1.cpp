@@ -145,7 +145,11 @@ auto World::act1_alert(int hc_idx) -> bool {
     }
 
 auto World::act1_kill(const Fight::Kill& kill, std::uint32_t now_ms) -> void {
-        if (kill.type == d2d::rules::monster_ids::kAndariel) andariel_died(kill, now_ms);   // a pet's kill too, the player dead
+        if (kill.type == d2d::rules::monster_ids::kAndariel) {
+            // The client death effect is independent of quest reward eligibility.
+            each_player([](Player& player) { player.events.push_back(ev::QuestQuake{}); });
+            andariel_died(kill, now_ms);
+        }   // a pet's kill too, the player dead
         if (kill.type == d2d::rules::monster_ids::kBloodRaven) blood_raven_died(now_ms);
         if (kill.super == d2d::rules::TowerQuest::kCountess) countess_died(now_ms);
     }
