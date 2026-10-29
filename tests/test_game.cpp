@@ -93,6 +93,11 @@ int main(int argc, char** argv) try {
         sent.game_quests.back() = 0x8000;
         sent.events = { ev::Reassigned{}, ev::Lightning{} };
         sent.party_pets.push_back({ Npc{}, UnitState{}, "WL", "hireable", 100 });   // a partner's merc (local co-op)
+        Monster monster;
+        monster.anim_pct = 25;
+        monster.props.ias = 60;
+        monster.props.fcr = 40;
+        sent.monsters = { monster };
         ViewEncoder encoder;
         const auto bytes = encode_view(empty_data, sent, encoder);
         View received;
@@ -101,6 +106,37 @@ int main(int argc, char** argv) try {
         assert(received.game_quests == sent.game_quests);
         assert(received.events.size() == 2 && std::holds_alternative<ev::Reassigned>(received.events[0]) && std::holds_alternative<ev::Lightning>(received.events[1]));
         assert(received.pets.empty() && received.party_pets.size() == 1 && received.party_pets[0].pettype == "hireable" && received.party_pets[0].mode == "WL");
+        assert(received.monsters.size() == 1);
+        assert(received.monsters[0].anim_pct == 25 && received.monsters[0].props.ias == 60 && received.monsters[0].props.fcr == 40);
+        assert(anim_rate_pct(received.monsters[0], "A1") == 65 && anim_rate_pct(received.monsters[0], "SC") == 55);
+        sent.monsters[0].anim_pct = 30;
+        assert(apply_view(empty_data, encode_view(empty_data, sent, encoder), received));
+        assert(anim_rate_pct(received.monsters[0], "A1") == 70);
+    }
+    {
+        // Event 1's deadline is specific to the operate function: most
+        // container functions queue FrameCnt1 + 1, while the Gidbinn altar
+        // and Moldy Tome queue FrameCnt1. A shrine uses only its client clock.
+        Npc object;
+        object.op_frames = 10;
+        object.mode2 = true;
+        object.frames[1] = 10;
+        object.frame_delta[1] = 120;   // client reaches FrameCnt1 - 1 after 20 ticks
+        object.operate_fn = d2d::rules::operate_fn::kChest;
+        assert(object_op_ticks(object) == 11);
+        object.mode2 = false;
+        assert(object_op_ticks(object) == 20);  // callback 0x581490 requires Mode2
+        object.mode2 = true;
+        object.operate_fn = d2d::rules::operate_fn::kMoldyTome;
+        assert(object_op_ticks(object) == 10);
+        object.operate_fn = d2d::rules::operate_fn::kGidbinnAltar;
+        assert(object_op_ticks(object) == 10);
+        object.operate_fn = d2d::rules::operate_fn::kShrine;
+        assert(object_op_ticks(object) == 20);
+        object.frames[1] = 1;          // no client transition on a one-frame mode
+        assert(object_op_ticks(object) == -1);
+        object.operate_fn = d2d::rules::operate_fn::kChest;
+        assert(object_op_ticks(object) == 11);  // server event still transitions it
     }
     {
         // MonProp's stats on a monster: IAS on A1 / A2, FCR on SC (120 x v /
