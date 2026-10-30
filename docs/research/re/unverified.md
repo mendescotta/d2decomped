@@ -19,7 +19,6 @@ trust. `git grep -n "unverified (source"` lists them.
 | DS1 layer stream order | components/ds1/ds1.hpp | OpenDiablo2's reader | every DS1 parses to its exact size | the DS1 loader (`FUN_00665950` area) |
 | DT1 block y-shift, `max(0, -min(block.y))` | components/dt1/dt1.hpp | OpenDiablo2's renderer | tiles draw seamlessly | the DT1 loader / tile blitter |
 | pal.dat is BGR triples | components/palette/palette.hpp | OpenDiablo2's d2dat.Load | colours match the game's screens | the palette loader |
-| TBL values are Latin-1 bytes | components/tbl/tbl.hpp | OpenD2's Latin path | English strings read right | `.\StrTable\strtable.cpp`'s reader |
 | .d2s header layout | components/d2s/d2s.hpp | the Phrozen Keep d2s spec | 19 real 1.14d saves (test_d2s) | the save reader |
 | .d2s item bitstream layout | components/d2s/d2s_items.hpp | the community d2s spec | 19 real saves: every list ends on the next "JM" | the item (de)serializer |
 | PL2 layout past the base palette | docs/research/formats/pl2.md | OpenDiablo2's d2pl2 | probing menu1/Pal.PL2 | the PL2 loader |
@@ -38,3 +37,4 @@ trust. `git grep -n "unverified (source"` lists them.
 | Iso projection: a subtile is (x - y) * 16, (x + y) * 8; units centre on H/2 - 8, floors on the view less the 40-pixel panel | `FUN_00643260`, `FUN_00643310`, `FUN_0045b440` / `FUN_0045afd0`, `FUN_0044c990` / `FUN_00476000`, `FUN_004de730` | apps/d2d/common.hpp `kViewY` |
 | COF priority row for a direction (round the compass, not DCC order) | `FUN_00470ec0`, `FUN_004db2e0`, `FUN_00600e20` (0x6e55a0), `FUN_004db110` | cof-draw-order.md |
 | Object animation length: Objects.txt FrameCnt[mode] (not the COF / AnimData), held on the last frame without CycleAnim, else back to Start[mode] | `FUN_004bcbb0` | objects.md "Animation length" |
+| TBL values are UTF-8; d2d's byte zero-extension mismatches 12 non-ASCII English values | `FUN_005259c0`, `FUN_00526320`, `FUN_00526100`; all 8,949 installed ENG entries compared | tbl-strings.md |
