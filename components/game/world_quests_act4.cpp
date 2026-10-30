@@ -12,6 +12,7 @@
 #include <quests.hpp>
 #include <quests_act4.hpp>
 #include <rules.hpp>
+#include <shake.hpp>
 #include <uniques.hpp>
 #include <algorithm>
 #include <array>
@@ -199,6 +200,10 @@ auto World::act4_kill(const Fight::Kill& kill, std::uint32_t now_ms) -> void {
 auto World::diablo_release(std::uint32_t now_ms) -> void {
         if (terror.released) return;
         terror.released = true;
+        // FUN_005b5230 broadcasts the quest flag; FUN_0046b290 starts
+        // diablo appears only for clients in the Chaos Sanctuary.
+        if (level->id == d2d::rules::level_ids::kChaosSanctuary)
+            each_player([](Player& player) { player.events.push_back(ev::QuestQuake{ d2d::rules::QuestQuake::diablo }); });
         if (level->id == d2d::rules::level_ids::kChaosSanctuary)
             for (std::size_t i = 0; i < fight.monsters.size(); ++i)
                 if (auto& monster = fight.monsters[i]; monster.alive() && monster.type != d2d::rules::TerrorQuest::kDiablo) {

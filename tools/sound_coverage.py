@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Which of the base install's sounds d2d can play, and which it can't.
 
-Usage: sound_coverage.py <mpq dir> [--all]   (from the repo root, after a build)
+Usage: sound_coverage.py <mpq dir> [--all] [--build BUILD]   (from the repo root, after a build)
 
 Every Sounds.txt row whose file is in d2sfx / d2speech / d2music is put
 in one bucket:
@@ -16,7 +16,9 @@ by bucket: the sounds still to trace. --all prints every name.
 Needs build/tools/mpq-cat/mpq-cat (and D2_PATCH_INSTALLER for 1.14d's
 excel tables, as mpq-cat reads them).
 """
+import argparse
 import collections, glob, os, re, subprocess, sys, tempfile
+from pathlib import Path
 
 # The data columns d2d reads a sound from (components/game/gamedata_load.cpp).
 kRead = {"MonSounds.Attack1", "MonSounds.Attack2", "MonSounds.Weapon1", "MonSounds.Weapon2", "MonSounds.HitSound",
@@ -32,8 +34,15 @@ kTables = ["MonSounds", "skills", "Missiles", "states", "misc", "armor", "weapon
 kSoundEnviron = ("Song", "Day Ambience", "Night Ambience", "Day Event", "Night Event")
 kBase = ("d2sfx", "d2speech", "d2music")
 
-mpq_dir = sys.argv[1]
-mpq_cat = os.path.join("build", "tools", "mpq-cat", "mpq-cat")
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('mpq_dir')
+parser.add_argument('--all', action='store_true')
+parser.add_argument('--build', type=Path, default=Path('build'), help='build containing tools/mpq-cat/mpq-cat')
+args = parser.parse_args()
+mpq_dir = args.mpq_dir
+mpq_cat = args.build.resolve() / 'tools/mpq-cat/mpq-cat'
+if not mpq_cat.is_file() or not os.access(mpq_cat, os.X_OK):
+    parser.error(f'mpq-cat is not executable: {mpq_cat}')
 
 def cat(path, mpqs=mpq_dir):
     done = subprocess.run([mpq_cat, mpqs, path], capture_output=True)
@@ -159,5 +168,5 @@ for index in sorted(base):
     todo[bucket].append(by_index[index][0])
 print(f"base install sounds: {len(base)}, d2d can play {covered}, not yet {len(base) - covered}")
 for bucket, names in sorted(todo.items(), key=lambda kv: -len(kv[1])):
-    shown = names if "--all" in sys.argv else sorted({re.sub(r"_\d+$", "", n) for n in names})[:6]
+    shown = names if args.all else sorted({re.sub(r"_\d+$", "", n) for n in names})[:6]
     print(f"{len(names):5d}  {bucket}: {' '.join(shown)}")

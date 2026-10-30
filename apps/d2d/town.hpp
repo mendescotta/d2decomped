@@ -21,12 +21,14 @@
 #include "store.hpp"
 #include "ui.hpp"
 #include "world_view.hpp"
+#include "tile_blit.hpp"
 
 #include <d2s_items.hpp>
 #include <quests.hpp>
 #include <overlays.hpp>
 #include <rules.hpp>
 #include <shrines.hpp>
+#include <shake.hpp>
 #include <skills.hpp>
 #include <weather.hpp>
 
@@ -229,6 +231,9 @@ struct Town {
     bool press_on_ui = false;              // the held left button was pressed on the UI
     std::uint32_t world_ms = 0;            // the World's clock: when it last ticked
     float prev_x = 0, prev_y = 0;          // the player a tick before: the camera slides between the two
+    d2d::rules::ScreenShake shake;
+    d2d::rules::Rng shake_rng{ 666 };  // d2d seed; random offsets are not oracle-checked
+    std::vector<d2d::rules::QuestQuake> quest_quakes;
     float cam_x = 0, cam_y = 0;            // where the camera is this frame
     float party_x = 0, party_y = 0;        // local co-op: the camera's eased point, toward the party's middle
     std::uint32_t party_ms = 0;            // when it last eased

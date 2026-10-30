@@ -840,6 +840,8 @@ void register_game_verbs(d2d::devctl::Channel& channel, Window& win, Screen& scr
              + " voice=" + std::to_string(audio.voice_sound())
              + " music=" + std::to_string(audio.music.sound)
              + " music_old=" + std::to_string(audio.music_old.sound)
+             + " quake=" + std::format("{},{},{},{},{}", town.shake.envelope(town.now_ms), town.shake.offset.first, town.shake.offset.second,
+                                         audio.quake_loop.sound, audio.quake_level)
              + " sfx=" + [&] {   // world sounds on: Sounds.txt index:owner:gain (left/right when split), p = paused
                    std::string playing;
                    for (const auto& sfx_channel : audio.sfx) {

@@ -3,6 +3,7 @@
 
 #include "game_api.hpp"
 
+#include <shake.hpp>
 #include <d2gs/c2s.hpp>
 #include <d2gs/c2s_names.hpp>
 #include <d2gs/exe_tables.hpp>
@@ -10,6 +11,7 @@
 #include <d2gs/s2c_names.hpp>
 #include <d2gs/wire.hpp>
 #include <log.hpp>
+#include <monster_ids.hpp>
 #include <d2s_items.hpp>
 #include <join.hpp>
 #include <tcp.hpp>
@@ -43,7 +45,7 @@ auto key(int type, std::uint32_t id) -> std::uint64_t { return std::uint64_t(typ
 // The S->C ids NetGame acts on (the net log's "used").
 auto used_ids() -> std::bitset<256> {
     std::bitset<256> used;
-    for (const int id : { 0x75, 0x7f, 0x8d, 0x10, 0x26, 0x5a, 0x01, 0x02, 0x03, 0x04, 0x06, 0x09, 0x27, 0x5d, 0x81, 0x9c, 0x9d, 0x42, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x0a, 0x0c, 0x0d, 0x0f, 0x15, 0x18, 0x0e, 0x28, 0x77, 0x78, 0x79, 0x82, 0x8b, 0x8c, 0x8e, 0x2c, 0x51, 0x59, 0x5c, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x95, 0x96, 0xac, 0xab, 0xaf, 0xb3, 0xb4, 0x7a })
+    for (const int id : { 0x89, 0x75, 0x7f, 0x8d, 0x10, 0x26, 0x5a, 0x01, 0x02, 0x03, 0x04, 0x06, 0x09, 0x27, 0x5d, 0x81, 0x9c, 0x9d, 0x42, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x0a, 0x0c, 0x0d, 0x0f, 0x15, 0x18, 0x0e, 0x28, 0x77, 0x78, 0x79, 0x82, 0x8b, 0x8c, 0x8e, 0x2c, 0x51, 0x59, 0x5c, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x95, 0x96, 0xac, 0xab, 0xaf, 0xb3, 0xb4, 0x7a })
         used.set(std::size_t(id));
     return used;
 }
@@ -398,6 +400,9 @@ auto NetGame::handle(const d2d::net::Bytes& packet) -> void {
     case 0x0e:   // object state: +1 type (2), +2 id, +8 u32 the new mode
         if (size >= 12 && packet[1] == 2) object_modes.push_back({ read_u32(packet, 2), int(read_u32(packet, 8)) });
         break;
+    case 0x89:   // quest flag: 12 starts diablo appears (FUN_0046b650 table 0x7129d8)
+        if (size >= 2 && packet[1] == 12) quest_quakes.push_back(d2d::rules::QuestQuake::diablo);
+        break;
     case 0x5d: {   // quest log news: +1 quest record, +2 flags (2: a sound), +3 log state, +4 s16 (quests.md)
         // No flags: the record's log state (its row is its word) and the Quest
         // Log button; flags 0x20 (the Den's): the state and the count.
@@ -434,7 +439,7 @@ auto NetGame::handle(const d2d::net::Bytes& packet) -> void {
             npc_quests.push_back(std::move(npc_quest));
         }
         break;
-    case 0x8a:   // NPC interaction: +1 type, +2 id (the host's NPC think, FUN_00544660: one of its quests has something for us)
+    case 0x8a:   // NPC interaction: +1 type, +2 id (the host's NPC think, LAB_00544660: one of its quests has something for us)
         if (size >= 6 && packet[1] == 1) npc_alerts.push_back(read_u32(packet, 2));
         break;
     case 0x7a:   // pet list: +1 add (else removed), +2 PetType row, +3 u16 MonStats class, +5 owner, +9 id
@@ -459,6 +464,8 @@ auto NetGame::handle(const d2d::net::Bytes& packet) -> void {
     case 0x6a: case 0x6c:   // ... on a unit
         if (size >= 6) {
             auto& unit = unit_at(1, read_u32(packet, 1));
+            if (packet[5] == 8 && unit.mode != 8 && unit.mode != 9 && unit.cls == d2d::rules::monster_ids::kAndariel)
+                quest_quakes.push_back(d2d::rules::QuestQuake::andariel);
             unit.mode = packet[5];
             unit.mode_ms = steady_ms();
             if (unit.mode == 8 || unit.mode == 9) { unit.life = 0; unit.moving = false; }   // dying / dead: no hit says so

@@ -5,7 +5,7 @@
 // .\StrTable\strtable.cpp): a 21-byte packed header, an indices array
 // (u16 * NodesNumber, unused for lookup — hash-mapping metadata), a hash
 // node array (17 packed bytes each), then the string data blob. Keys are
-// NUL-terminated ASCII, values NUL-terminated UTF-16LE.
+// NUL-terminated ASCII, values NUL-terminated UTF-8 (FUN_00526100).
 //
 // We ignore the on-disk hash structure and rebuild a std::unordered_map
 // at load time — TBLs are small (largest is ~400 KB), map lookup is O(1),
@@ -92,7 +92,7 @@ private:
             if (std::uint8_t(node[0]) == 0) continue;   // deleted entry
             const auto keyOff = rd32(node + 0x07);
             const auto valOff = rd32(node + 0x0b);
-            const auto valLen = rd16(node + 0x0f);        // includes NUL, in u16 chars
+            const auto valLen = rd16(node + 0x0f);        // includes NUL, in bytes
 
             if (keyOff >= bytes.size() || valOff >= bytes.size()) continue;
 
@@ -101,11 +101,9 @@ private:
             std::size_t keyLen = 0;
             while (keyLen < keyMax && keyp[keyLen] != '\0') ++keyLen;
 
-            // D2 stores values as single-byte (Latin-1 / Windows-1252 for
-            // LATIN builds; a locale-specific MBCS for CYR/JPN/KOR). Non-LATIN
-            // builds aren't handled here yet — treat every byte as Latin-1 for
-            // now. unverified (source: OpenD2's Latin path): the encoding;
-            // non-Latin installs untested (unverified.md, todo.md "Formats").
+            // ponytail: game.exe decodes UTF-8 to UTF-16 through FUN_00526320
+            // and FUN_00526100; this zero-extends bytes instead. The separate
+            // font-map lead-byte path applies to non-Latin fonts, not UTF-8.
             if (valLen == 0 || valOff + std::size_t(valLen) > bytes.size()) continue;
             const auto* valp = reinterpret_cast<const unsigned char*>(bytes.data() + valOff);
             std::u16string value;

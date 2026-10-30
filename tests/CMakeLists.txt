@@ -55,6 +55,7 @@ d2d_add_test(test_quest_bounds game)
 d2d_add_test(test_light rules)
 d2d_add_test(test_weather rules)
 d2d_add_test(test_overlays rules)
+d2d_add_test(test_shake rules)
 d2d_add_test(test_combat rules)
 d2d_add_test(test_drops rules)
 d2d_add_test(test_skills rules)
@@ -67,6 +68,9 @@ d2d_add_test(test_gamepad)   # the pad's action mapping: header-only, no SDL
 target_include_directories(test_gamepad PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d)
 d2d_add_test(test_keyconfig)   # game.exe's key bindings: header-only, no SDL
 target_include_directories(test_keyconfig PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d)
+d2d_add_test(test_tile_blit game dt1 palette font dc6)   # the DT1 blitters against their per-pixel first form
+target_sources(test_tile_blit PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d/tile_blit.cpp)
+target_include_directories(test_tile_blit PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d)
 d2d_add_test(test_switches switches CLI11::CLI11)   # game.exe's one-dash switches, before CLI11
 
 # End-to-end: headless d2d driven over devctl (SDL dummy driver).

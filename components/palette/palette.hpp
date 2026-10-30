@@ -31,11 +31,11 @@ class Palette {
 public:
     Palette() = default;
 
-    // Accepts a 768-byte pal.dat (BGR triples; unverified (source:
-    // OpenDiablo2's d2dat.Load); the data agrees — the colours match
-    // game.exe's screens) or a .PL2 (RGBA at offset 0). Auto-detects layout from
-    // total size: exactly 768 → BGR-packed DAT; 4-byte stride → RGBA PL2.
-    // Larger DAT-style buffers are truncated; short buffers throw.
+    // Accepts a 768-byte pal.dat (BGR triples: game.exe 1.14d
+    // FUN_004fb1e0 / FUN_00605210; docs/research/re/palette.md) or a .PL2
+    // (RGBA at offset 0). Auto-detects layout from total size: exactly 768 →
+    // BGR-packed DAT; 4-byte stride → RGBA PL2. Larger DAT-style buffers are
+    // truncated; short buffers throw.
     explicit Palette(std::span<const std::byte> bytes) {
         // PL2 files start with 256 * 4-byte RGBA (unused alpha byte). Any
         // buffer at least that big AND longer than the plain 768-byte DAT is
@@ -55,7 +55,7 @@ public:
         if (bytes.size() < kNeed)
             throw std::runtime_error("palette: need 768 bytes, got fewer");
         for (std::size_t i = 0; i < 256; ++i) {
-            // DAT layout is (B, G, R) per index (unverified, see above).
+            // DAT layout is (B, G, R) per index (game.exe evidence above).
             entries_[i] = Rgba{
                 std::uint8_t(bytes[i * 3 + 2]),   // R
                 std::uint8_t(bytes[i * 3 + 1]),   // G
@@ -95,31 +95,26 @@ private:
 };
 
 // PL2 colormap file. We currently parse:
-//   * base 256 RGBA at offset 0                      → base_palette()
-//   * MaxComponentBlend[256][256] at offset 210176   → additive(fg, bg)
-//   * Transparency50[256][256]     at offset 374016  → blend50(fg, bg)
+//   * base 256 RGBA at offset 0                    → base_palette()
+//   * additive[256][256] at offset 0x33500         → additive(fg, bg)
+//   * max-component blend at offset 0x5b500        → blend50(fg, bg)
 //
 // The additive table is D2's TRANS_ADDITIVE mode — the fire, spell VFX,
 // and shrine glows all blend through it. Given (foreground_idx, bg_idx)
-// it returns the palette index whose colour has the per-channel max of
-// the two — palette-preserving, unlike RGB-clamp additive which drifts
+// it returns the palette index whose colour has the clamped per-channel sum
+// of the two — palette-preserving, unlike direct RGB addition which drifts
 // off the palette and looks off-key.
 //
-// Both offsets validated empirically against menu1/Pal.PL2:
-//   * 210176: T[i][0]=i AND T[0][j]=j on every index; result brightness
-//     always >= max(fg, bg) — additive semantics.
-//   * 374016: T[i][i]=i (blending with self is self) — 50% alpha blend.
-//
-// Other transforms (LightLevelVariations, HueVariations, TextColorShifts,
-// Transparency25/75, per-channel tone shifts) are in the file but not
-// exposed here — add when a subsystem asks for one. See
-// docs/research/re/pl2-layout.md for the layout notes.
+// ponytail: blend50 is misnamed and reads the max-component-weighted table;
+// game.exe's actual 50/50 alpha table is at 0x13500. The full traced layout
+// and oracle diff are in docs/research/formats/pl2.md. Other transforms are
+// not exposed here — add when a subsystem asks for one.
 class Pl2 {
 public:
     static constexpr std::size_t kFileSize        = 443175;
     static constexpr std::size_t kBaseOff         = 0;
-    static constexpr std::size_t kAdditiveOff     = 210176;
-    static constexpr std::size_t kBlend50Off      = 374016;
+    static constexpr std::size_t kAdditiveOff     = 0x33500;
+    static constexpr std::size_t kBlend50Off      = 0x5b500;
     // The 13 text colours' index shifts (FUN_004fb1e0 copies PL2 +0x6b627
     // to 0x7d5668 and hands it to the driver: a glyph's index i draws as
     // shift[colour][i]); their RGBs at +0x6b600 (0x7d563c).
