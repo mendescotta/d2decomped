@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Exercise the MPQ wrapper against real D2 archives if available.
-// Skips (D2D_TEST_SKIPPED) when D2_MPQ_DIR isn't set — the test can't fabricate a
-// real MPQ and we don't want CI without game data to fail.
+// Skips (D2D_TEST_SKIPPED) without game data; the installer tests also create a
+// small synthetic base MPQ to exercise a failed delta.
 //
 // D2_MPQ_DIR must contain at least d2char.mpq; d2data.mpq is a bonus that
 // exercises the Stack. QSettings-picked default lets the plain developer
@@ -10,6 +10,7 @@
 #include <mpq.hpp>
 
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -49,6 +50,9 @@ int main() try {
 
         assert(!archive.contains("this/file/does/not/exist"));
         assert(!archive.try_read("nope").has_value());
+        bool open_error = false;
+        try { (void)archive.try_read(""); } catch (const std::exception&) { open_error = true; }
+        assert(open_error);  // StormLib rejects an empty name; it is not a missing entry.
 
         // A real D2 file we spotted in the archive listing.
         const auto cof = archive.read(R"(data\global\CHARS\NE\COF\NEWL1HT.COF)");
@@ -71,6 +75,7 @@ int main() try {
         assert(mpqs.contains("(listfile)"));   // both have it; d2char answers first
         const auto data = mpqs.read("(listfile)");
         assert(!data.empty());
+        assert(!mpqs.try_read("") && mpqs.failed(""));
     }
 
     // 1.14d patch installer as the patch_d2 layer (D2_PATCH_INSTALLER, or
@@ -86,6 +91,35 @@ int main() try {
         const auto compcode = mpqs.try_read("data/global/excel/COMPCODE.txt");   // any case/slash
         assert(compcode && std::memcmp(compcode->data(), "component\tcode", 14) == 0);
         assert(!mpqs.contains(R"(data\global\excel\armor.txt)"));      // delta, no base yet
+        // A listed delta with an incompatible base may fall back during play,
+        // but patch generation must never publish the unpatched base as 1.14d.
+        {
+            const auto scratch = fs::temp_directory_path() / ("d2d_test_mpq_" +
+                std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+            assert(fs::create_directory(scratch));
+            const auto wrong_base = scratch / "wrong_base.mpq";
+            HANDLE archive = nullptr;
+            assert(SFileCreateArchive(wrong_base.string<TCHAR>().c_str(), MPQ_CREATE_ARCHIVE_V1, 16, &archive));
+            HANDLE file = nullptr;
+            constexpr char contents[] = "not the expected base";
+            assert(SFileCreateFile(archive, R"(data\global\excel\armor.txt)", 0, sizeof(contents), 0, 0, &file));
+            assert(SFileWriteFile(file, contents, sizeof(contents), 0));
+            assert(SFileFinishFile(file));
+            assert(SFileCloseArchive(archive));
+            {
+                Stack permissive;
+                permissive.push_installer(inst);
+                permissive.push(wrong_base);
+                const auto fallback = permissive.try_read(R"(data\global\excel\armor.txt)");
+                assert(fallback && fallback->size() == sizeof(contents));
+                Stack strict;
+                strict.push_installer(inst);
+                strict.push(wrong_base);
+                assert(!strict.try_read(R"(data\global\excel\armor.txt)", true));
+                assert(strict.failed(R"(data\global\excel\armor.txt)"));
+            }
+            fs::remove_all(scratch);
+        }
         // With the base MPQs underneath, deltas are applied: 1.14d armor.txt
         // (76370 bytes, "namestr" column) from the CD's.
         if (fs::exists(dir / "d2exp.mpq")) {
@@ -93,6 +127,7 @@ int main() try {
             mpqs.push(dir / "d2data.mpq");
             const auto armor = mpqs.try_read(R"(data\global\excel\armor.txt)");
             assert(armor && armor->size() == 76370);
+            assert(mpqs.try_read(R"(data\global\excel\armor.txt)", true) == armor);
             const std::string head(reinterpret_cast<const char*>(armor->data()), 400);
             assert(head.find("\tnamestr\t") != std::string::npos);
             std::printf("installer delta applied: armor.txt %zu bytes\n", armor->size());

@@ -63,7 +63,7 @@ int main(int argc, char** argv) try {
             all.remove_prefix(std::min(all.size(), line.size() + 1));
             if (!line.starts_with("data\\") && !line.starts_with("Data\\")) continue;   // Game.exe and the DLLs go beside it, not in it
             std::string name(line.substr(0, line.find(';')));
-            auto bytes = mpqs.try_read(name);
+            auto bytes = mpqs.try_read(name, true);
             if (!bytes) { std::fprintf(stderr, "mpq-cat: %s not readable from the installer or the MPQs below it\n", name.c_str()); return 1; }
             files.emplace_back(std::move(name), std::move(*bytes));
         }

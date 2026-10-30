@@ -60,7 +60,7 @@ namespace d2d::game {
 // The client's OP counter runs to FrameCnt1 - 1 (FUN_004bcbb0). These
 // known operation functions also queue event 1 (FUN_005417d0); the altar
 // and Moldy Tome schedule it at FrameCnt1, the others at FrameCnt1 + 1.
-// Other event-1 callers remain to be mapped to their operate functions.
+// ponytail: map the other event-1 callers to their operate functions.
 int object_op_ticks(const Npc& npc) {
     if (!npc.op_frames) return 0;
     int client = -1;
