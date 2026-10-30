@@ -451,8 +451,11 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
                 const int speed = d2d::rules::attack_speed(int(anim.speed ? anim.speed : 256), actor->player_combat.ias, actor->player_combat.wsm, chill_rate(now_ms));
                 cues.cue_on(unit_key(kSoundOnPlayer, actor->id), swing.sound, now_ms + std::uint32_t((swing.frames * 256 + 128) / speed) * 40, actor->player.x, actor->player.y);
             }
-        } else if ((mode == kModeGH || mode == kModeBL || mode == kModeSC) && anim.frames) {
-            const int stat = mode == kModeGH ? actor->player_combat.fhr : mode == kModeBL ? actor->player_combat.fbr : actor->player_combat.fcr;
+        } else if (mode == kModeSC && anim.frames) {
+            // ponytail: a cast that plays a sequence (Lightning) is timed as a plain one here.
+            len = std::uint32_t(d2d::rules::cast_ticks(int(anim.frames), int(anim.speed ? anim.speed : 256), actor->player_combat.fcr)) * 40;
+        } else if ((mode == kModeGH || mode == kModeBL) && anim.frames) {
+            const int stat = mode == kModeGH ? actor->player_combat.fhr : actor->player_combat.fbr;
             const int shown = d2d::rules::speed_frames(int(anim.frames), stat);
             len = std::uint32_t(shown) * anim.ms_per_frame();
         }
