@@ -1179,8 +1179,10 @@ and per-class base frames, not a table. What's stored:
 
 - **Port.** Nothing lives as a "breakpoint table": `rules::cast_ticks`
   (combat.hpp) times a plain cast by FCR, `rules::speed_frames` shortens GH /
-  BL by FHR / FBR. The table above counts `frames_shown` of the older formula, one
-  more than the ticks a cast takes (the end test above).
+  BL by FHR / FBR. The table above counts `frames_shown` of the older formula, which
+  assumes AnimData speed 256: there it is one more than the ticks a cast takes (the
+  end test above). The Druid's SC runs at speed 208, so its row does not hold:
+  `cast_ticks(15, 208, 0)` is 18 ticks at 0 FCR, not 14.
 
 ### Still unknown
 - Each skill's own srvstfunc / srvdofunc body beyond Attack, [2] and Bash's
