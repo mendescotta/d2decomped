@@ -38,6 +38,11 @@ int main() {
     tables.item_base["big"] = { .cost = 100000 };
     tables.item_base["gem"] = { .cost = 200 };
     tables.item_base["key"] = { .cost = 10, .stackable = true };
+    tables.item_info["tbk"] = { .type = "book" };
+    tables.item_base["tbk"] = { .cost = 250, .stackable = true };
+    tables.book_charge_cost["tbk"] = 50;
+    tables.item_info["aqv"] = { .type = "bowq" };
+    tables.item_base["aqv"] = { .cost = 256, .stackable = true };
     tables.prefix_cost = { { 0, 0 }, { 1024, 100 } };           // row 0 = none
     NpcPrice charsi;
     charsi.sell = 256;
@@ -61,6 +66,14 @@ int main() {
     assert(item_price(tables, three, "Charsi", false, header) == 3000);                // non-stackable x quantity
     Item keys = item("key"); keys.quantity = 3;
     assert(item_price(tables, keys, "Charsi", false, header) == 10);                   // stackables priced once
+    Item tome = item("tbk");
+    tome.quantity = 4;
+    assert(item_price(tables, tome, "Nobody", false, header) == 450);                  // cost 250 + 4 scrolls x CostPerCharge 50
+    assert(item_price(tables, tome, "Nobody", true, header) == 450);                   // the same base when sold
+    assert(item_price(tables, item("tbk"), "Nobody", false, header) == 300);           // no quantity read: counts as 1
+    Item arrows = item("aqv");
+    arrows.quantity = 350;
+    assert(item_price(tables, arrows, "Nobody", false, header) == 87);                 // cost x quantity / 1024
     assert(item_price(tables, item("nothing"), "Charsi", false, header) == 1);         // never below 1
     assert(item_price(tables, item("hax"), "Nobody", true, header) == 1000);           // no npc.txt row: unscaled
     d2d::d2s::Header quest = header;
