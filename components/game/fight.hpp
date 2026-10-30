@@ -479,8 +479,8 @@ struct Fight {
     [[nodiscard]] const GameData::Appearance& gfx() const;
     [[nodiscard]] const GameData::AnimTiming& player_anim(int mode) const;
     // A swing takes attack_ticks for the item attack speed and weapon
-    // speed; get-hit, block and self cast recover faster with FHR / FBR /
-    // FCR (rules::speed_frames on the animation's base frame count).
+    // speed; a cast takes cast_ticks (FCR), get-hit and block recover
+    // faster with FHR / FBR (rules::speed_frames on the base frame count).
     void set_pmode(int mode, std::uint32_t now_ms);
     void do_sounds(std::uint32_t now_ms);           // the skill's do: its dosound, and tgtsound on its target
     [[nodiscard]] bool dead() const;

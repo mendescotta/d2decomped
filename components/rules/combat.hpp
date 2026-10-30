@@ -200,6 +200,24 @@ inline int speed_frames(int base_frames, int speed_stat) {
     return (base_frames * 256 + 256 + scaled - 1) / (256 + scaled);
 }
 
+// A cast animation's speed, 1/256 frames a tick (FUN_00623f50's cast branch at
+// 0x623fcb: FUN_00621740 turns stat 105 into the effective FCR through the row
+// at 0x6e8e3c): AnimData speed x min(100 + effective FCR, 175) / 100, clamped
+// to 0..0x7fff.
+inline int cast_speed(int rate, int fcr) {
+    return std::clamp(rate * std::min(100 + effective_speed(fcr), 175) / 100, 0, 0x7fff);
+}
+
+// Client ticks a plain cast (a mode with no sequence) lasts. FUN_00463390 asks
+// FUN_006217c0 after each step whether `current + speed >= frames x 256`, so the
+// last step is never taken: ceil(256 x frames / speed) - 1 ticks, at least one
+// (tools/emu/cast_rates.py runs game.exe's code for it).
+inline int cast_ticks(int frames, int rate, int fcr) {
+    if (frames <= 0) return 0;
+    const int speed = std::max(cast_speed(rate, fcr), 1);
+    return std::max((256 * frames + speed - 1) / speed - 1, 1);
+}
+
 // Open wounds: bleeding per second for a character level (1.10's table in
 // 256ths a tick, times 25 ticks), for 8 seconds.
 inline int open_wounds_per_sec(int clvl) {

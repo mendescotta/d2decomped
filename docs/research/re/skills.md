@@ -1127,12 +1127,38 @@ and per-class base frames, not a table. What's stored:
   frames_shown = ceil(base_frames × 256 / (256 + floor(256 × EFCR / 100)))
   ```
 
-  Not traced from a specific FUN_ yet (no cast-rate `.cpp` string source in
-  `game-strings.tsv`; `updateanimrate` at 0x006ea5d8 is an
-  `itemstatcost.txt` op-column keyword parsed by FUN_00637a00, not the
-  frame-count calc). What's built into `rules::attack_ticks` already uses
-  the same shape for IAS, so the port only needs to swap `wsm` → `0`, the
-  IAS stat → FCR (stat 105), and `frames` → the class's SC (or S1) base.
+- **Traced in game.exe 1.14d** (2026-10-30, `tools/emu/cast_rates.py` runs it):
+  - `FUN_00623f50` sets the unit's per-tick rate (+0x4c). Its cast branch
+    (0x623fcb..0x624012) runs for a player's SC (mode 10), for a player's SQ
+    whose skill has seqtrans SC, and for a monster's SC (`FUN_006216e0` is the
+    test). It adds 100 to `FUN_00621740(unit, 2)`, caps the sum at 175, and sets
+    the rate to the AnimData record's speed (+0xc) x that / 100, truncated, at
+    most 0x7fff.
+  - `FUN_00621740` reads the row at 0x6e8e3c (stat 105 faster cast rate, flag 1,
+    factor 120; the neighbouring rows are IAS 93, FHR 99, FBR 102, FRW 96 with
+    150): with the stat value v it returns 120 x v / (120 + v), truncated, when
+    v is not 0. So the effective FCR stops mattering at 75: FCR 200 already
+    reaches the 175 cap (speed 448 of 256).
+  - A player mode is stepped by the client tick `FUN_00463390`: `FUN_006217c0`
+    asks whether it is over, `FUN_00623e00` takes a step if not, and
+    `FUN_006217c0` asks again; yes ends the mode. For a plain animation (+0x30
+    empty) it is over when current + speed >= +0x48, which `FUN_00624390` set to
+    the AnimData frame count x 256 (0x624473); current starts at 0 for SC (the
+    start-frame function `FUN_00623b10` returns 0 for it). So the last step is
+    skipped: a plain cast lasts ceil(256 x frames / speed) - 1 ticks, at
+    least one. A sequence is over when its countdown (+0x48) is <= 0
+    (`FUN_00621260` sets it to the sequence's step count x 256, 0x62129a):
+    ceil(256 x steps / speed) ticks, no minus one (see the Lightning notes).
+  - Checked: `tools/emu/cast_rates.py` runs the cast branch and the end test on
+    game.exe for FCR 0..400 at AnimData speeds 208 and 256 and the SC frame
+    counts below; `test_combat --cast-rates` prints d2d's in the same form and
+    the two match. The tick counts are the published tables' (Sorc 13/12/11/10/9/8/7
+    at 0/9/20/37/63/105/200; Amazon 19/18 at 0/7; Assassin 16/15 at 0/8, 9 at 174).
+  - Not traced: the code that picks the SC animation for each skill (Skills.txt
+    `anim`, +0x10), the client's other tick path for a monster's cast, and
+    negative FCR (the formula as written gives a negative effective value; d2d keeps v).
+  - D2MOO's `Units.cpp` (MIT; its functions carry these 1.14d addresses) reads the
+    same: the 120-factor table, the 175 cap, the speed product and the two end tests.
 
 - **Verification.** Running the formula against `SOSCHTH` base = 14 sweeps
   through breakpoints `[0, 9, 20, 37, 63, 105, 200]` matching the community
@@ -1151,9 +1177,12 @@ and per-class base frames, not a table. What's stored:
   | Paladin | 16 | 0→16 9→15 18→14 30→13 48→12 75→11 125→10 232→9 |
   | Sorceress | 14 | 0→14 9→13 20→12 37→11 63→10 105→9 200→8 |
 
-- **Port.** Nothing lives as a "breakpoint table": `rules::speed_frames`
-  (combat.hpp) shortens the animation's base frame count by FCR / FHR /
-  FBR.
+- **Port.** Nothing lives as a "breakpoint table": `rules::cast_ticks`
+  (combat.hpp) times a plain cast by FCR, `rules::speed_frames` shortens GH /
+  BL by FHR / FBR. The table above counts `frames_shown` of the older formula, which
+  assumes AnimData speed 256: there it is one more than the ticks a cast takes (the
+  end test above). The Druid's SC runs at speed 208, so its row does not hold:
+  `cast_ticks(15, 208, 0)` is 18 ticks at 0 FCR, not 14.
 
 ### Still unknown
 - Each skill's own srvstfunc / srvdofunc body beyond Attack, [2] and Bash's

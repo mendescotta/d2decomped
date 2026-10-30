@@ -1,7 +1,7 @@
 # Lighting and time of day — game.exe 1.14d
 
 d2d: `components/rules/light.hpp` (`Day`, `LightGrid`, test_light),
-`frame_light` (town.hpp) and `Lighting` / `blit_dt1_tile_lit` (world.hpp).
+`frame_light` (town.hpp) and `Lighting` / `blit_dt1_tile_lit` (tile_blit.hpp).
 
 ## The day (ENVIRONMENT\Env.cpp)
 

@@ -71,7 +71,7 @@ Known differences in the ones it draws, and what's left to check:
 
 | # | What | Kind | Seen | Where |
 |---|---|---|---|---|
-| 25 | Timings from the COF, where AnimData.d2 is game.exe's | exact | maybe | world_view.hpp:198, fight.hpp:498, fight.hpp:729 |
+| 25 | Timings from the COF, where AnimData.d2 is game.exe's | exact | maybe | world_view.hpp:140, fight.hpp:498, fight.hpp:729 |
 | 27 | Kind 8's visible state overlays aren't rotated after 50 ticks; active states draw together | exact | maybe | states.md, town.hpp `StateClock`; Radius is stamped and LoopWaitTime applies only to kind 6 |
 | 28 | A joined monster's act lasts 600 ms, not its animation | exact | maybe | town.cpp `net_overlay`; balloon starts and rate now traced (quests.md) |
 | 29 | COF transparent layers: which of 25 / 50 / 75 % draw effects 0..2 are | trace | maybe | unverified.md, deviations.md approximation 9 |

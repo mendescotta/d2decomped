@@ -27,6 +27,15 @@ int main(int argc, char** argv) {
             for (int percent = 0; percent <= 400; ++percent) std::printf("%d %d %d\n", mode, percent, moving_anim_rate(mode == 3, percent));
         return 0;
     }
+    // `--cast-rates`: the cast speed and the ticks of a plain cast at every FCR 0..400, as
+    // tools/emu/cast_rates.py prints game.exe's (`rate FCR SPEED RATE`, `ticks plain FRAMES SPEED FCR TICKS`).
+    if (argc > 1 && std::string_view(argv[1]) == "--cast-rates") {
+        for (const int speed : { 208, 256 })
+            for (int fcr = 0; fcr <= 400; ++fcr) std::printf("rate %d %d %d\n", fcr, speed, cast_speed(speed, fcr));
+        for (const auto& [frames, speed] : std::to_array<std::array<int, 2>>({ { 14, 256 }, { 20, 256 }, { 16, 256 }, { 17, 256 }, { 15, 208 } }))
+            for (int fcr = 0; fcr <= 400; ++fcr) std::printf("ticks plain %d %d %d %d\n", frames, speed, fcr, cast_ticks(frames, speed, fcr));
+        return 0;
+    }
     // A walk's animation rate (FUN_00623f50): RN 0x65, WL / TW 0xd5, x the walk % (at least 25).
     assert(moving_anim_rate(false, 100) == 213 && moving_anim_rate(true, 150) == 151);
     assert(moving_anim_rate(false, 0) == 53 && moving_anim_rate(true, 400) == 404);
@@ -127,6 +136,17 @@ int main(int argc, char** argv) {
     assert(speed_frames(14, 37) == 11 && speed_frames(14, 63) == 10);
     assert(speed_frames(14, 105) == 9 && speed_frames(14, 200) == 8);
     assert(speed_frames(0, 105) == 0 && speed_frames(-3, 105) == 0);   // no anim, no shortening
+    // Casts (game.exe's own code, tools/emu/cast_rates.py): a plain cast is a tick under
+    // ceil(256 x frames / speed). Sorc SC, 14 frames: 13 at 0 FCR, then 12 / 11 / 10 / 9 / 8 / 7
+    // from 9 / 20 / 37 / 63 / 105 / 200.
+    assert(cast_ticks(14, 256, 0) == 13 && cast_ticks(14, 256, 8) == 13 && cast_ticks(14, 256, 9) == 12);
+    assert(cast_ticks(14, 256, 20) == 11 && cast_ticks(14, 256, 37) == 10 && cast_ticks(14, 256, 63) == 9);
+    assert(cast_ticks(14, 256, 105) == 8 && cast_ticks(14, 256, 200) == 7);
+    assert(cast_ticks(15, 208, 0) == 18 && cast_ticks(15, 208, 4) == 17 && cast_ticks(15, 208, 163) == 10);   // Druid SC: AnimData speed 208
+    assert(cast_ticks(20, 256, 0) == 19 && cast_ticks(20, 256, 7) == 18);                                      // Amazon SC
+    assert(cast_ticks(17, 256, 0) == 16 && cast_ticks(17, 256, 8) == 15 && cast_ticks(17, 256, 174) == 9);   // Assassin SC
+    assert(cast_speed(256, 200) == 448 && cast_speed(256, 400) == 448);                                       // the rate stops at 175
+    assert(cast_ticks(0, 256, 105) == 0 && cast_ticks(1, 256, 0) == 1);
     assert(open_wounds_per_sec(1) == 3 && open_wounds_per_sec(81) == 227);
 
     // Player blows: sure hits (AR vastly over defense), crushing blow takes a

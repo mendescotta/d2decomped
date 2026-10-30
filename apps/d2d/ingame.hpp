@@ -7,6 +7,7 @@
 #include "scene.hpp"
 #include "ui.hpp"
 #include "world_view.hpp"
+#include "tile_blit.hpp"
 
 #include <d2s_items.hpp>
 #include <weather.hpp>
