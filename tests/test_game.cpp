@@ -119,7 +119,7 @@ int main(int argc, char** argv) try {
     {
         // Event 1's deadline is specific to the operate function: most
         // container functions queue FrameCnt1 + 1, while the Gidbinn altar
-        // and Moldy Tome queue FrameCnt1. A shrine uses only its client clock.
+        // and Moldy Tome queue FrameCnt1. A shrine also queues +1.
         Npc object;
         object.op_frames = 10;
         object.mode2 = true;
@@ -135,9 +135,12 @@ int main(int argc, char** argv) try {
         object.operate_fn = d2d::rules::operate_fn::kGidbinnAltar;
         assert(object_op_ticks(object) == 10);
         object.operate_fn = d2d::rules::operate_fn::kShrine;
-        assert(object_op_ticks(object) == 20);
+        assert(object_op_ticks(object) == 11);
         object.frames[1] = 1;          // no client transition on a one-frame mode
+        assert(object_op_ticks(object) == 11);  // shrine's server event still transitions it
+        object.mode2 = false;
         assert(object_op_ticks(object) == -1);
+        object.mode2 = true;
         object.operate_fn = d2d::rules::operate_fn::kChest;
         assert(object_op_ticks(object) == 11);  // server event still transitions it
     }
@@ -997,10 +1000,12 @@ int main(int argc, char** argv) try {
     assert(std::ranges::count(world.cues.due, data->sound_index.at("shrine_recharge"), &Cues::Cue::sound) == 1);
     world.tick({}, 901 * kTickMs, 900 * kTickMs);
     assert(world.npc_states[std::size_t(shrine_index)].says == 3683 + shrine->shrine && world.view().boost_code == 14);
-    // OP from its use, then ON once its counter reaches FrameCnt1 - 1 (Start1 0 at FrameDelta1 a tick).
+    // OP from its use, then ON at the earlier client counter or shrine server event.
     assert(world.npc_states[std::size_t(shrine_index)].mode == "OP" && world.npc_states[std::size_t(shrine_index)].mode_ms == 900 * kTickMs);
     assert(shrine->loop_from[1] == 0 && shrine->frame_delta[1] > 0);
-    const std::uint32_t on_ms = (900 + std::uint32_t(((shrine->frames[1] - 1) * 256 + shrine->frame_delta[1] - 1) / shrine->frame_delta[1])) * kTickMs;
+    const int client_ticks = ((shrine->frames[1] - 1) * 256 + shrine->frame_delta[1] - 1) / shrine->frame_delta[1];
+    const int on_ticks = shrine->mode2 ? std::min(client_ticks, int(shrine->op_frames) + 1) : client_ticks;
+    const std::uint32_t on_ms = (900 + std::uint32_t(on_ticks)) * kTickMs;
     world.tick({}, on_ms - kTickMs, 901 * kTickMs);
     assert(world.npc_states[std::size_t(shrine_index)].mode == "OP");
     world.tick({}, on_ms, on_ms - kTickMs);

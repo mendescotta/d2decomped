@@ -141,12 +141,14 @@ the object's flag byte:
   (0x732cf4, trap-firebolt); then it runs the table at 0x732cec. So act 1
   has no lightning or nova chest traps, and poison only in cellar 5.
   d2d: `rules::trap_on_level`, `World::arm_trap` / `spring_traps`.
-- Opening (operate fns 1, 3, 4, 5, 6, 14, 30, the waypoint) sets mode 1
+- Opening (operate fns 1, 2, 3, 4, 5, 6, 14, 30, the waypoint) sets mode 1
   and queues event 1 at FrameCnt1 + 1 frames. The Moldy Tome (fn 6) is an
   exception at FrameCnt1, as is the Gidbinn altar (fn 31, object 252).
   These server events only transition a unit still in mode 1 with Mode2;
   the client can transition first when its counter reaches FrameCnt1 - 1.
-  The shrine (fn 2) has no such server event and follows its client counter.
+  The shrine (fn 2, `FUN_00583c70`) also queues +1. Corpse / crate (fn 14)
+  calls the event scheduler at 0x586800. Other event-1 callers remain to be
+  mapped to their operate functions; this list is not exhaustive.
   Only Act 2's jugs (142, 143) change collision between the two modes.
 
 | Trap | Function | Does |

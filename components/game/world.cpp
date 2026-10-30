@@ -57,9 +57,10 @@ namespace d2d::game {
 
 // Levels.txt Waypoint: a level's index in the waypoint bits (FUN_00660e00), -1 none.
 // `level`'s units states, the ones its rooms made since (populate) added as they start.
-// The client's OP counter runs to FrameCnt1 - 1 (FUN_004bcbb0). Only
-// these operation functions also queue event 1 (FUN_005417d0); the altar
+// The client's OP counter runs to FrameCnt1 - 1 (FUN_004bcbb0). These
+// known operation functions also queue event 1 (FUN_005417d0); the altar
 // and Moldy Tome schedule it at FrameCnt1, the others at FrameCnt1 + 1.
+// Other event-1 callers remain to be mapped to their operate functions.
 int object_op_ticks(const Npc& npc) {
     if (!npc.op_frames) return 0;
     int client = -1;
@@ -72,7 +73,7 @@ int object_op_ticks(const Npc& npc) {
     using namespace d2d::rules::operate_fn;
     int delay = 0;
     switch (npc.operate_fn) {
-    case kCasket: case kUrn: case kChest: case kBarrel: case kCorpse: case kTrapObject: case kWaypoint:
+    case kShrine: case kCasket: case kUrn: case kChest: case kBarrel: case kCorpse: case kTrapObject: case kWaypoint:
         delay = 1;
         break;
     case kMoldyTome: case kGidbinnAltar:
