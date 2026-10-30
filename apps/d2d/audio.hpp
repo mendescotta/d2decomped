@@ -358,7 +358,7 @@ struct Audio {
     void stop_world() {
         stop_quake();
         for (auto& channel : sfx) stop(channel);
-        for (auto* channel : { &ambience, &ambience_old, &rain, &quake_loop }) stop(*channel);
+        for (auto* channel : { &ambience, &ambience_old, &rain }) stop(*channel);
         world_paused = false;
         menu_paused = false;                     // left from the game menu: step_ducks fades back up
     }

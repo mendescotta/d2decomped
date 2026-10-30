@@ -60,7 +60,7 @@ struct QuestQuake {
         const auto delay = std::uint32_t(kind == andariel ? 90 : 150) * 40;
         if (!shaken && elapsed >= delay) {
             shaken = true;
-            // FUN_004d5310: CltParam2=7 seconds, divided into thirds;
+            // FUN_004d5310: 7 seconds: 2 rise, 3 hold, 2 fall;
             // FUN_004d6540: strength 25, hold 4000, no ramp or fade.
             if (kind == andariel) shake.start(8, 2000, 3000, 2000, born + delay);
             else shake.start(25, 0, 4000, 0, born + delay);
