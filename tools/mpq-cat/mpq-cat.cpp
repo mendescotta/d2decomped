@@ -44,7 +44,7 @@ int main(int argc, char** argv) try {
     } else {
         const auto patch = dir / "patch_d2.mpq";
         const bool has_patch = std::filesystem::exists(patch, filesystem_error);
-        if (filesystem_error) { std::fprintf(stderr, "mpq-cat: cannot check %s: %s\n", patch.c_str(), filesystem_error.message().c_str()); return 1; }
+        if (filesystem_error) { std::fprintf(stderr, "mpq-cat: cannot check %s: %s\n", patch.string().c_str(), filesystem_error.message().c_str()); return 1; }
         if (has_patch) mpqs.push(patch);
         else if (installer) mpqs.push_installer(installer);
     }
@@ -52,7 +52,7 @@ int main(int argc, char** argv) try {
         const auto path = dir / name;
         filesystem_error.clear();
         if (std::filesystem::exists(path, filesystem_error)) mpqs.push(path);
-        else if (filesystem_error) { std::fprintf(stderr, "mpq-cat: cannot check %s: %s\n", path.c_str(), filesystem_error.message().c_str()); return 1; }
+        else if (filesystem_error) { std::fprintf(stderr, "mpq-cat: cannot check %s: %s\n", path.string().c_str(), filesystem_error.message().c_str()); return 1; }
     }
     if (!patch_out.empty()) {
         const auto list = d2d::mpq::Archive(installer).read("patch.lst");
