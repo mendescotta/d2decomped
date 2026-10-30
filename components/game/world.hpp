@@ -29,6 +29,7 @@
 #include <quests_act5.hpp>
 #include <rules.hpp>
 #include <sequences.hpp>
+#include <shake.hpp>
 
 #include <algorithm>
 #include <initializer_list>
@@ -64,6 +65,9 @@ struct Reassigned {};
 // A Thunder Storm bolt struck (its client do 84, FUN_004e3c50): the
 // weather's lightning (FUN_00472c50).
 struct Lightning {};
+// Client control missile effects, started once on receipt (FUN_0046ba50,
+// FUN_0046b290); carried by the native view codec too.
+struct QuestQuake { d2d::rules::QuestQuake::Kind kind = d2d::rules::QuestQuake::andariel; };
 // Arrived at an object or NPC that opens a panel (game.exe's 0x58 "open
 // UI" and the NPC interaction).
 // A talk carries the NPC's quest messages for the player (quests.hpp).
@@ -76,7 +80,7 @@ struct QuestNews { int quest = 0; };
 // A short quest music sting, over the level's looping song.
 struct MusicCue { int sound = 0; };
 }  // namespace ev
-using Event = std::variant<ev::LevelChanged, ev::Reassigned, ev::Lightning, ev::OpenUI, ev::Speech, ev::QuestNews, ev::MusicCue>;
+using Event = std::variant<ev::LevelChanged, ev::Reassigned, ev::Lightning, ev::QuestQuake, ev::OpenUI, ev::Speech, ev::QuestNews, ev::MusicCue>;
 
 // What a client is told after each tick (the S -> C side, network.md):
 // everything it draws and clicks on. In-process these are copies; a TCP

@@ -146,3 +146,8 @@ there next time (`FUN_004b9a00`'s offset).
 
 d2d: town.hpp plays the events (pan = x / 750), audio.hpp keeps
 `song_resume` and seeks with AL_SAMPLE_OFFSET.
+
+Screen shake uses its own unplaced quake loop and instance-volume envelope;
+see [unit-sounds.md](unit-sounds.md#screen-shake-and-quest-control-missiles).
+Andariel death and Diablo arrival start it; Diablo also plays its arrival
+taunt. Other shake triggers and the control missiles' visuals remain open.

@@ -58,8 +58,9 @@
 //
 // Output: each tile gets a width × abs(height) row-major byte buffer with
 // (none with Pixels::skip: headers and subtile flags only)
-// palette indices; index 0 is transparent. Blocks with negative y are
-// shifted by |height| so all row indices are non-negative.
+// palette indices; index 0 is transparent. game.exe draws the signed block
+// coordinates directly (FUN_005130a0); d2d instead shifts blocks by
+// max(0, -min(block.y)) to pack this nonnegative buffer (docs/research/re/dt1.md).
 #pragma once
 
 #include <array>
@@ -161,11 +162,10 @@ private:
         if (pixels == Pixels::skip) return;
 
         // Pass 2: block headers + decode into each tile's pixel buffer.
-        // Y-shift is computed from actual block Y positions:
-        // tileYOffset = max(0, -min(block.y)).
-        // unverified (source: OpenDiablo2's renderer): the y-shift. Blocks whose
-        // shifted rows still fall outside the buffer get silently clipped by
-        // put_pixel — that matches D2's behaviour on odd tiles.
+        // d2d packs the decoded blocks into a nonnegative pixel buffer using
+        // y_shift = max(0, -min(block.y)). game.exe draws signed block Y
+        // directly (docs/research/re/dt1.md). put_pixel clips decoded pixels
+        // that fall outside d2d's own buffer.
         constexpr std::size_t kBlockHdr = 20;
         struct BlockDecode {
             std::int16_t x, y;

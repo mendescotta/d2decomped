@@ -26,6 +26,7 @@
 #include <quests.hpp>
 #include <replication.hpp>
 #include <rules.hpp>
+#include <shake.hpp>
 #include <sequences.hpp>
 #include <skill_text.hpp>
 #include <skills.hpp>
@@ -91,7 +92,7 @@ int main(int argc, char** argv) try {
         sent.level = &empty_data.town;
         sent.quest_log.back() = 9;
         sent.game_quests.back() = 0x8000;
-        sent.events = { ev::Reassigned{}, ev::Lightning{} };
+        sent.events = { ev::Reassigned{}, ev::Lightning{}, ev::QuestQuake{ d2d::rules::QuestQuake::diablo } };
         sent.party_pets.push_back({ Npc{}, UnitState{}, "WL", "hireable", 100 });   // a partner's merc (local co-op)
         ViewEncoder encoder;
         const auto bytes = encode_view(empty_data, sent, encoder);
@@ -99,8 +100,14 @@ int main(int argc, char** argv) try {
         assert(apply_view(empty_data, bytes, received));
         assert(received.quest_log == sent.quest_log);
         assert(received.game_quests == sent.game_quests);
-        assert(received.events.size() == 2 && std::holds_alternative<ev::Reassigned>(received.events[0]) && std::holds_alternative<ev::Lightning>(received.events[1]));
+        assert(received.events.size() == 3 && std::holds_alternative<ev::Reassigned>(received.events[0]) && std::holds_alternative<ev::Lightning>(received.events[1]));
+        assert(std::get<ev::QuestQuake>(received.events[2]).kind == d2d::rules::QuestQuake::diablo);
         assert(received.pets.empty() && received.party_pets.size() == 1 && received.party_pets[0].pettype == "hireable" && received.party_pets[0].mode == "WL");
+        auto bad = bytes;
+        assert(bad[bad.size() - 4] == 7);   // final event, before the empty sound count
+        bad[bad.size() - 3] = 2;
+        assert(!apply_view(empty_data, bad, received));
+        assert(!apply_view(empty_data, std::span(bytes).first(bytes.size() - 3), received));
     }
     {
         // MonProp's stats on a monster: IAS on A1 / A2, FCR on SC (120 x v /
@@ -412,6 +419,34 @@ int main(int argc, char** argv) try {
         assert(bird_world.golden_bird.bound == first_act3 && !bird_world.golden_bird.armed && bird_world.fight.made_bosses.empty());
     }
 
+    {
+        // Every local participant gets the effect even after quest credit;
+        // the all-seals trigger starts Diablo's sequence only once.
+        World effects(&*data, -1, -1);
+        effects.enter(character);
+        auto partner = character;
+        partner.name = "QuakePartner";
+        effects.join(partner);
+        for (auto& participant : effects.players) {
+            participant->events.clear();
+            d2d::rules::quest::set(participant->character.header.quests[0], 6, 0);
+        }
+        effects.act1_kill({ d2d::rules::monster_ids::kAndariel, 0, 0, 1 }, 1000);
+        for (auto& participant : effects.players) {
+            assert(participant->events.size() == 1);
+            assert(std::get<ev::QuestQuake>(participant->events[0]).kind == d2d::rules::QuestQuake::andariel);
+            participant->events.clear();
+        }
+        Level sanctuary;
+        sanctuary.id = d2d::rules::level_ids::kChaosSanctuary;
+        effects.level = &sanctuary;
+        effects.diablo_release(1000);
+        effects.diablo_release(1040);
+        for (const auto& participant : effects.players) {
+            assert(participant->events.size() == 1);
+            assert(std::get<ev::QuestQuake>(participant->events[0]).kind == d2d::rules::QuestQuake::diablo);
+        }
+    }
     World world(&*data, -1, -1);
     world.enter(character);
     for (std::uint32_t tick = 1; tick <= 25; ++tick) world.tick({}, tick * kTickMs, (tick - 1) * kTickMs);

@@ -35,3 +35,13 @@ include them. A quest check that fails on a run left overnight is usually
 the machine sleeping: look for a time gap in its `$TMPDIR/d2d_quests_*/d2d.log`
 (kept after the run) before blaming the code. A `--devctl` socket path must
 be short (AF_UNIX limit), so put it in `/tmp`.
+
+`test_shake` checks screen-shake envelopes and quake-loop instance volumes
+against 175 captured stock 1.14d cases, plus 26 control-missile frame cases,
+skipped render frames, timer wraparound and offset bounds. Rebuild the
+fixtures with `tools/emu/shake.py` and its `--controls` option (see the emu
+README). `test_game` checks both effect kinds in the view codec and the
+quest effects reaching local co-op participants.
+The Act 1 and Act 4 headless quest tests also wait for the real quest
+effects to reach the client offsets and OpenAL quake channel, check that a
+level change stops the loop, and observe Diablo's delayed arrival taunt.
