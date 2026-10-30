@@ -2376,7 +2376,7 @@ auto Fight::player_modes(bool held, std::uint32_t now_ms, float elapsed) -> bool
                 if (!held) actor->attack_mon = -1;
             }
         } else if (actor->pmode == kModeSC) {                       // a self cast: its state on the action frame
-            if (!actor->pstruck && now_ms >= actor->player.mode_ms + player_anim(kModeSC).action_ms()) {
+            if (!actor->pstruck && now_ms >= actor->player.mode_ms + std::uint32_t(float(player_anim(kModeSC).action_ms()) / actor->prate)) {
                 actor->pstruck = true;
                 do_sounds(now_ms);
                 if (const auto* skill = game_data->skills.get(actor->swing_skill); skill && skill->srvdofunc == ServerDoFunction::kBookOrScroll) {
