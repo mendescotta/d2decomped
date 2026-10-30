@@ -6,12 +6,14 @@ the doc with the details. Add a row whenever a trace ends in one.
 
 **Kinds:**
 - **stub**: a table entry or call target whose body is a bare return.
+- **dead**: code computes data that no consumer reads.
 - **orphan**: a real function with no caller, raw pointer or rel32 call.
 - **unreachable**: real code whose trigger never happens in the shipped data.
 - **suspected unreachable**: no trigger found yet, but not every path to one is checked (the row says which).
 
 | Address | What | Kind | Effect in 1.14d | d2d | Details |
 |---|---|---|---|---|---|
+| `0x4fb204–0x4fb22a` | DAT palette loop fills a local four-byte-stride array | dead | the local array is never read; the active palette comes from PL2 | not ported | palette.md "DAT and active-palette layout" |
 | `0x5fd200` | UberBaal think (MonAI 145) | stub (`ret 4`) | uber Baal stands after his target search | `mon_think` returns none | monster-ai.md "AncientStatue and the ubers' MonAIs", bugs.md #26 |
 | `0x5f81c0` | UberMephisto think (MonAI 146) | stub (`ret 4`) | uber Mephisto stands | same | same |
 | `0x5e9df0` | UberDiablo think (MonAI 147) | stub (`ret 4`) | uber Diablo stands | same | same |
