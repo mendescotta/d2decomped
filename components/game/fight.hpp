@@ -97,6 +97,34 @@ inline bool throwable(const GameData& game_data, const std::string& code) {
     const auto found = game_data.rules.item_base.find(code);
     return game_data.thrown.contains(code) && found != game_data.rules.item_base.end() && found->second.stackable;
 }
+// Throw's weapon gate (FUN_00647640, skill 2): the weapon in hand
+// (FUN_0063c9b0: the right hand's, else the left's, of type weap 0x2d and
+// usable, not flag 0x100 broken / 0x4000: FUN_0062a4e0) is a throwable or
+// has stat 125 (item_throwable). A spent magic stack stays in hand broken
+// (Fight::out_of_ammo), so it can't throw. docs/research/re/throw.md.
+// No 1.14d item rolls stat 125 (stubs.md), so Fight::ammo_index and the
+// launch take only a throwable.
+// ponytail: a dual-wielder (FUN_006235a0: barbarian, assassin) with two
+// weapons: either counts here; game.exe takes the primary (FUN_0063bef0,
+// inventory +0x1c), else the other hand's (FUN_00643d60).
+inline bool throw_ready(const GameData& game_data, const Character& character) {
+    return std::ranges::any_of(character.items, [&](const d2d::d2s::Item& item) {
+        if (item.location != d2d::d2s::item_location::kEquipped || (item.slot != d2d::d2s::body_location::kRightArm && item.slot != d2d::d2s::body_location::kLeftArm)) return false;
+        const auto info = game_data.rules.item_info.find(item.code);
+        if (info == game_data.rules.item_info.end() || !d2d::rules::type_is(game_data.rules, info->second.type, "weap") || (item.flags & 0x4100u) != 0) return false;
+        return throwable(game_data, item.code) || std::ranges::any_of(item.props, [](const d2d::d2s::ItemProp& prop) { return prop.stat == 125 && prop.value > 0; });
+    });
+}
+// A known skill the character can't use now (FUN_00647960 says 2): the
+// picker and the button draw it in text colour 1 (FUN_004aa3a0 /
+// FUN_004a8d30 on FUN_004d9fc0), and a cast stops with the class's
+// impossible_1 (FUN_004610c0, reason 0x13 at 0x711ddc).
+// ponytail: only Throw's weapon gate; FUN_00647960's other statuses (1
+// mana, 4, 5, 6, the other weapon gates) aren't kept.
+inline bool skill_refused(const GameData& game_data, const Character& character, int id) {
+    const auto* skill = game_data.skills.get(id);
+    return skill && skill->srvdofunc == d2d::rules::ServerDoFunction::kThrow && !throw_ready(game_data, character);
+}
 inline bool attack_mode(int mode) { return mode == kModeA1 || mode == kModeKK || mode == kModeS1 || mode == kModeS3 || mode == kModeS4; }
 // A finishing move releases charges (FUN_005d5220 runs after Attack's
 // srvdofunc and the finishers'): Attack, Dragon Talon, Dragon Tail, each
@@ -108,8 +136,8 @@ inline bool finisher(const d2d::rules::Skill* skill) {
 
 // The character's level in a skill (the World's for the fight, the skill
 // bar's for show): points (a class skill's from the save's skill bytes in
-// Skills.txt order; Attack, Throw with a throwable in hand, and a tome's
-// skill with the tome carried, 1),
+// Skills.txt order; Attack and Throw, which every class starts with
+// (FUN_00647ee0 -> FUN_00647110), and a tome's skill with the tome carried, 1),
 // then with what the gear gives (gear_props: worn, socketed, set bonuses,
 // charms) and `extra` (the skill shrine's +all skills) — on skills that
 // have points or that an item grants (rules::item_grants_skill).
@@ -121,13 +149,7 @@ inline int skill_base_level(const GameData& game_data, const Character& characte
     if (id == 0) return 1;
     const auto* skill = game_data.skills.get(id);
     if (!skill) return 0;
-    // ponytail: game.exe keeps Throw at level 1 (FUN_00647110) and gates the
-    // weapon apart (FUN_00647640, status 2 in FUN_00647960); here level 0
-    // without a throwable stands in for that gate. The picker, the dual-wield
-    // hand fallback and the cast path aren't checked yet (re/throw.md).
-    if (skill->srvdofunc == d2d::rules::ServerDoFunction::kThrow)
-        return std::ranges::any_of(character.items, [&](const d2d::d2s::Item& item) { return item.location == d2d::d2s::item_location::kEquipped
-            && (item.slot == d2d::d2s::body_location::kRightArm || item.slot == d2d::d2s::body_location::kLeftArm) && throwable(game_data, item.code); }) ? 1 : 0;
+    if (skill->srvdofunc == d2d::rules::ServerDoFunction::kThrow) return 1;   // the weapon is skill_refused's
     const char* tome = skill->name == "Book of Townportal" ? "tbk" : skill->name == "Book of Identify" ? "ibk" : nullptr;
     return tome && std::ranges::any_of(character.items, [&](const d2d::d2s::Item& item) { return item.code == tome && item.location == d2d::d2s::item_location::kStored; }) ? 1 : 0;
 }
@@ -344,6 +366,7 @@ struct Fight {
         std::uint32_t merc_poison_until = 0;
         double regen_acc_life = 0, regen_acc_mana = 0;
         std::uint32_t need_mana_until = 0;
+        std::uint32_t impossible_until = 0;   // impossible_1's repeat guard, as need_mana_until's
         bool portal_due = false;                       // Town Portal's action frame came
         // The wisps' dance's blessing on the player (FUN_005f39b0): stat 0x50
         // (magic find) for 0x1a5e00 frames, the last one's.
@@ -510,6 +533,9 @@ struct Fight {
     // (DAT_007a0498) is skipped.
     // ponytail: FUN_004b9e90's guard (a voice already playing) isn't kept.
     void need_mana(std::uint32_t now_ms);
+    // Reason 0x13 (status 2, skill_refused): the class table's +8,
+    // <class>_impossible_1 (amazon 0xb89), with need_mana's guard.
+    void impossible(std::uint32_t now_ms);
     // An SQ skill plays its sequence (FUN_00663310: seqnum's frames for
     // the weapon class) at the attack's speed; with no frames for the
     // weapon it swings once.
