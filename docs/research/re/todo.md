@@ -2,9 +2,10 @@
 
 One list of what d2d still doesn't do, or doesn't do the way game.exe
 1.14d does, in the base game (no expansion). Act 5 and the LoD-only
-classes and items are out of scope here: what's open there is in PLAN.md
-"Checkpoint 2026-10-24: Act 5" ("Still open for Act 5"). The details stay
-in the docs each row points to; this file is the index. Rows as of
+classes and items are out of scope here. PLAN.md
+"Checkpoint 2026-10-24: Act 5" is a historical list, not a maintained index
+of current expansion gaps. The details stay in the docs each row points
+to; this file is the classic index. Rows as of
 2026-10-23; the sound and `ponytail:` counts as of 2026-10-28.
 
 **Kind:**

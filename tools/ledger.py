@@ -1,17 +1,35 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check the research ledger and render its bounded inventory (Python 3.11+)."""
+"""Check the JSON research ledger and render its bounded inventory (Python 3.9+)."""
 import argparse
 from collections import Counter
+from datetime import date
 import hashlib
+import json
 from pathlib import Path
 import re
 import sys
-import tomllib
 
 REGISTRIES = ('requirements', 'original-bugs', 'deviations', 'missing', 'unverified', 'regressions')
 SOURCES = ('bugs', 'deviations', 'todo', 'stubs', 'unverified')
 STATUSES = {'unknown', 'documented', 'reported-fixed', 'reported-open', 'retracted', 'traced'}
+MIRRORED = ('title', 'subsystem', 'original_behavior', 'port_behavior', 'status', 'confidence',
+            'owner', 'last_verified_commit', 'evidence', 'tests')
+
+
+def unique_object(pairs):
+    """JSON duplicate keys are invalid, including metadata and nested records."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f'duplicate JSON key: {key}')
+        result[key] = value
+    return result
+
+
+def invalid_constant(value):
+    """The JSON format excludes NaN and infinities accepted by json's defaults."""
+    raise ValueError(f'invalid JSON numeric constant: {value}')
 
 
 def source_rows(root):
@@ -49,14 +67,29 @@ def check(root):
     records = {}
     counts = Counter()
     for name in REGISTRIES:
-        doc = tomllib.loads((root / 'docs/research/ledger' / f'{name}.toml').read_text(encoding='utf-8'))
-        if doc.get('schema_version') != 1:
+        doc = json.loads((root / 'docs/research/ledger' / f'{name}.json').read_text(encoding='utf-8'),
+                         object_pairs_hook=unique_object, parse_constant=invalid_constant)
+        if not isinstance(doc, dict):
+            raise ValueError(f'{name}: registry must be a JSON object')
+        if type(doc.get('schema_version')) is not int or doc['schema_version'] != 1:
             raise ValueError(f'{name}: unsupported schema_version')
+        commit = doc.get('indexed_at_commit')
+        if not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}', commit):
+            raise ValueError(f'{name}: indexed_at_commit requires a full commit')
+        imported = doc.get('imported_on')
+        if not isinstance(imported, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', imported):
+            raise ValueError(f'{name}: imported_on requires YYYY-MM-DD')
+        try:
+            date.fromisoformat(imported)
+        except ValueError as error:
+            raise ValueError(f'{name}: invalid imported_on date') from error
+        if not isinstance(doc.get('provenance'), str) or not doc['provenance'].strip():
+            raise ValueError(f'{name}: provenance must be a nonempty string')
         if not isinstance(doc.get('entry'), list):
-            raise ValueError(f'{name}: entry must be an array of tables')
+            raise ValueError(f'{name}: entry must be an array of objects')
         for row in doc['entry']:
             if not isinstance(row, dict):
-                raise ValueError(f'{name}: entry must contain tables')
+                raise ValueError(f'{name}: entry must contain objects')
             identity = row.get('id')
             if not isinstance(identity, str) or not re.fullmatch(r'[A-Z]+-[0-9]+', identity) or identity in records:
                 raise ValueError(f'{name}: invalid/duplicate id: {identity}')
@@ -99,6 +132,10 @@ def check(root):
                 raise ValueError(f'{identity}: requirement needs one registry link')
             if identity not in records[row['links'][0]][1]['links']:
                 raise ValueError(f'{identity}: link is not reciprocal')
+            linked = records[row['links'][0]][1]
+            for field in MIRRORED:
+                if row[field] != linked[field]:
+                    raise ValueError(f'{identity}: mirrored {field} differs from {linked["id"]}')
             continue
         key = row.get('source_key')
         if key:
@@ -110,8 +147,11 @@ def check(root):
             if row.get('source_columns') != list(cells) or row.get('source_cells') != list(cells.values()):
                 raise ValueError(f'{identity}: retained source cells differ from source')
             covered[key] = identity
-        if not any(records[target][0] == 'requirements' for target in row['links']):
-            raise ValueError(f'{identity}: missing requirement link')
+        requirements = [target for target in row['links'] if records[target][0] == 'requirements']
+        if len(requirements) != 1:
+            raise ValueError(f'{identity}: needs exactly one requirement link')
+        if records[requirements[0]][1]['links'] != [identity]:
+            raise ValueError(f'{identity}: requirement link is not reciprocal')
     missing = current.keys() - covered.keys()
     if missing:
         raise ValueError('unmapped source rows: ' + ', '.join(sorted(missing)))

@@ -8,12 +8,12 @@ The Markdown research files remain the detailed evidence and policy record.
 
 | File | Scope |
 |---|---|
-| requirements.toml | Stable requirement IDs linked to one registry record each |
-| original-bugs.toml | Every bugs.md row, including suspicions and findings called not a bug |
-| deviations.toml | Improvements, approximations and additions, including historical matches |
-| missing.toml | todo.md table rows and separately identified original stubs/dead code |
-| unverified.toml | Unverified rows and their separately identified Traced history |
-| regressions.toml | 189 valid/valid-minor audit findings plus five recent port defects; includes tooling and documentation defects |
+| requirements.json | Stable requirement IDs linked to one registry record each |
+| original-bugs.json | Every bugs.md row, including suspicions and findings called not a bug |
+| deviations.json | Improvements, approximations and additions, including historical matches |
+| missing.json | todo.md table rows and separately identified original stubs/dead code |
+| unverified.json | Unverified rows and their separately identified Traced history |
+| regressions.json | 189 valid/valid-minor audit findings plus five recent port defects; includes tooling and documentation defects |
 
 The same behavior can appear in several source lists. Requirement rows mirror
 registry records; neither count is a count of independent verified behaviors.
@@ -25,7 +25,11 @@ its long tail of `ponytail:` notes remain outside this initial table migration.
 ## Schema version 1
 
 Each file has `schema_version`, `indexed_at_commit`, `imported_on` and
-`provenance`, followed by `[[entry]]` records. Each entry contains:
+`provenance`, and an `entry` array of objects. `indexed_at_commit` is a full
+lowercase commit SHA, `imported_on` a valid YYYY-MM-DD date, and `provenance`
+a nonempty string.
+Duplicate JSON object keys and nonfinite numeric constants are rejected.
+Each entry contains:
 
 - `id`, `title`, `subsystem`: stable identity and scope; unclassified scope stays explicit.
 - `original_behavior`, `port_behavior`: bounded descriptions or explicit unknowns.
@@ -38,6 +42,11 @@ Each file has `schema_version`, `indexed_at_commit`, `imported_on` and
 - `last_verified_commit`: unknown until the behavior is checked at a full commit SHA.
 - `links`: reciprocal requirement/registry links; additional related IDs may be added.
 - `aliases`: old citations, qualified by source and section to avoid ambiguity.
+
+Each registry record links to exactly one requirement, which links back only
+to that record. Requirements mirror `title`, `subsystem`, `original_behavior`,
+`port_behavior`, `status`, `confidence`, `owner`, `last_verified_commit`,
+`evidence` and `tests`. Their IDs and aliases remain independent.
 
 Source-table entries additionally retain `source_key`, `source_sha256`,
 `source_columns`, `source_cells` and `source_kind`. The fingerprint detects
@@ -56,7 +65,7 @@ provenance without publishing the local audit dumps or game assets.
 
 ## Maintaining and checking
 
-Use Python 3.11 or newer (standard library only):
+Use Python 3.9 or newer (standard library only):
 
 ```
 python3 tools/ledger.py --check
@@ -66,10 +75,10 @@ python3 -m unittest discover -s tools -p test_ledger.py
 ```
 
 The checker is read-only unless `--write-summary` is explicit. It returns 1
-for malformed TOML/schema, duplicate IDs/aliases, dangling links, missing local
+for malformed JSON/schema, duplicate IDs/aliases, dangling links, missing local
 references, missing/stale source rows or a stale summary. It never fetches URLs,
 executes evidence, or claims a linked test passed. CTest runs `research_ledger`
-when its Python interpreter is at least 3.11; older Python still runs existing
+when its Python interpreter is at least 3.9; older Python still runs existing
 game tests and CMake reports that ledger checking needs a newer interpreter.
 
 When a source row is resolved, retain it with historical status instead of
