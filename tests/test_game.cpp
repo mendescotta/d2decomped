@@ -1031,8 +1031,10 @@ int main(int argc, char** argv) try {
         world.level = &one_frame_moor;
         world.swap_npcs(moor);
         world.operate(shrine_index, 5000 * kTickMs, 14);
+        assert(object_op_ticks(one_frame) == -1);
         world.tick({}, 5001 * kTickMs, 5000 * kTickMs);
-        assert(object_op_ticks(one_frame) == -1 && world.npc_states[std::size_t(shrine_index)].mode == "OP");
+        // rooms_up at the end of tick may rebuild the level's NPC vector.
+        assert(world.npc_states[std::size_t(shrine_index)].mode == "OP");
         world.level = moor;
         world.swap_npcs(&one_frame_moor);
         world.operated.erase({ &one_frame_moor, shrine_index });
