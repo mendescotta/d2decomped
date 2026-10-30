@@ -8,6 +8,7 @@
 // setup ("run the launcher, install, run this") work with zero env fuss.
 #include <log.hpp>
 #include <mpq.hpp>
+#include <StormLib.h>
 
 #include <cassert>
 #include <chrono>
@@ -64,6 +65,35 @@ int main() try {
         Archive archive(d2char);
         Archive moved(std::move(archive));
         assert(moved.contains("(listfile)"));
+    }
+
+    // A corrupt entry must not be mistaken for a missing file. Create a
+    // small archive, then write an impossible uncompressed size into its
+    // block table through StormLib's archive structures.
+    {
+        const auto scratch = fs::temp_directory_path() / ("d2d_corrupt_mpq_" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        assert(fs::create_directory(scratch));
+        const auto path = scratch / "corrupt.mpq";
+        HANDLE raw_archive = nullptr;
+        assert(SFileCreateArchive(path.string<TCHAR>().c_str(), MPQ_CREATE_ARCHIVE_V1, 16, &raw_archive));
+        HANDLE raw_file = nullptr;
+        constexpr char contents[] = "data";
+        assert(SFileCreateFile(raw_archive, "broken.txt", 0, sizeof(contents), 0, 0, &raw_file));
+        assert(SFileWriteFile(raw_file, contents, sizeof(contents), 0));
+        assert(SFileFinishFile(raw_file));
+        assert(SFileOpenFileEx(raw_archive, "broken.txt", 0, &raw_file));
+        static_cast<TMPQFile*>(raw_file)->pFileEntry->dwFileSize = 0x7fffffff;
+        static_cast<TMPQArchive*>(raw_archive)->dwFlags |= MPQ_FLAG_CHANGED;
+        assert(SFileCloseFile(raw_file));
+        assert(SFileCloseArchive(raw_archive));
+        {
+            Stack stack;
+            stack.push(path);
+            assert(!stack.try_read("missing.txt") && !stack.failed("missing.txt"));
+            assert(!stack.try_read("broken.txt") && stack.failed("broken.txt"));
+        }
+        fs::remove_all(scratch);
     }
 
     // Stack: two archives, first-added wins.

@@ -185,7 +185,14 @@ private:
         const std::string namez(name);
         HANDLE file{};
         if (!SFileOpenFileEx(handle_, namez.c_str(), 0, &file)) {
-            if (GetLastError() == ERROR_FILE_NOT_FOUND) return std::nullopt;
+            // StormLib 9.31 renamed its error accessor on every platform.
+            // An existence check cannot distinguish a corrupt entry from a
+            // missing one: it runs the same validation as the open.
+#if STORMLIB_VERSION >= 0x091F
+            if (SErrGetLastError() == ERROR_FILE_NOT_FOUND) return std::nullopt;
+#else
+            if (::GetLastError() == ERROR_FILE_NOT_FOUND) return std::nullopt;
+#endif
             throw std::runtime_error("MPQ open failed: " + namez);
         }
         const DWORD size = SFileGetFileSize(file, nullptr);
