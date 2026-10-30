@@ -688,6 +688,14 @@ auto Fight::need_mana(std::uint32_t now_ms) -> void {
         cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
     }
 
+auto Fight::impossible(std::uint32_t now_ms) -> void {
+        static constexpr std::array<const char*, 7> kImpossible{ "amazon_impossible_1", "sorceress_impossible_1", "necromancer_impossible_1",
+            "paladin_impossible_1", "barbarian_impossible_1", "druid_impossible_1", "assassin_impossible_1" };
+        if (now_ms < actor->impossible_until) return;
+        actor->impossible_until = now_ms + 75 * 40;
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kImpossible[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
+    }
+
 auto Fight::start_swing(std::uint32_t now_ms) -> bool {
         using namespace d2d::d2s;
         actor->swing_skill = 0;
@@ -2640,6 +2648,9 @@ auto Fight::cast_missile(int skill, float target_x, float target_y, std::uint32_
         using namespace d2d::d2s;
         const auto* skill_row = game_data->skills.get(skill);
         if (!skill_row || dead() || actor->pmode >= 0 || (!missile_skill(*skill_row) && !spot_skill(*skill_row))) return false;
+        // Throw is a spot skill: a held one (engage) whose last one's gone, or the weapons
+        // swapped since the command, stops here (FUN_004610c0's status 2).
+        if (skill_refused(*game_data, actor->character, skill)) { actor->attack_mon = -1; impossible(now_ms); return false; }
         const int lvl = cast_level(skill);
         const int cost = cost_of(*skill_row, lvl);
         if (lvl > 0 && actor->character.stats.values[kMana] < cost) need_mana(now_ms);
