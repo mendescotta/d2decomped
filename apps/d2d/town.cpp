@@ -21,6 +21,7 @@
 #include "skilltree.hpp"
 #include "speech_sound.hpp"
 #include "store.hpp"
+#include "tile_blit.hpp"
 #include "ui.hpp"
 #include "world_view.hpp"
 

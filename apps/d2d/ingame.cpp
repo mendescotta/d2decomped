@@ -8,6 +8,7 @@
 #include "panels.hpp"
 #include "scene.hpp"
 #include "store.hpp"
+#include "tile_blit.hpp"
 #include "ui.hpp"
 #include "watchdog.hpp"
 #include "world_view.hpp"
