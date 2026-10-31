@@ -18,6 +18,7 @@
 #include <functional>
 #include <optional>
 #include <queue>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -40,6 +41,7 @@ struct ItemInfo {
     std::string drop_sound;            // dropsound, played at flippy frame dropsfxframe
     int drop_frame = 0;
     std::string use_sound;             // usesound, played when the item is picked up, put down or worn
+    int range_adder = 0;               // weapons.txt rangeadder (the item record's +0x104 byte, FUN_006288d0)
 };
 // ItemTypes.txt by Code: the Equiv parents, the BodyLocs.txt slots the
 // type can be worn in (BodyLoc1/2, not inherited), its class (ama, sor,
@@ -1976,6 +1978,19 @@ inline int identify_all(std::vector<d2d::d2s::Item>& items) {
             ++count;
         }
     return count;
+}
+
+// FUN_0056bd10's pick (its callback 0x56bcd0, unsigned ids) among the
+// units it found (`ids`, any order): the lowest id above `last`, else the
+// lowest one up to it (round the ring; `last` itself when it's the lowest).
+// -1 none.
+inline int ring_pick(std::span<const int> ids, int last) {
+    int above = -1, lowest = -1;
+    for (const int id : ids) {
+        if (std::uint32_t(id) > std::uint32_t(last)) { if (above < 0 || std::uint32_t(id) < std::uint32_t(above)) above = id; }
+        else if (lowest < 0 || std::uint32_t(id) <= std::uint32_t(lowest)) lowest = id;
+    }
+    return above >= 0 ? above : lowest;
 }
 
 }  // namespace d2d::rules

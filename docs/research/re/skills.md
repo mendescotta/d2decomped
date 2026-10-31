@@ -408,8 +408,19 @@ lines (missile names aren't passed in). What it does:
 
 ### Target search, Fend, Impale, Holy Shield
 - **FUN_0056b7e0** walks the units in the rooms around the caster within
-  a radius (FUN_0056e510, the skill's range) that pass a filter (flags |
-  0xa783; skills pass 0x20003), calling a callback. **FUN_0056bc80** counts
+  a radius (squared subtiles, FUN_006492a0) that pass a filter
+  (FUN_0056b3e0, flags | 0xa783), calling a callback. The melee skills
+  pass 0x20003 and FUN_0056e510's radius: the weapon's range + 4
+  (FUN_00622870: the hand's weapon, weapons.txt rangeadder at item record
+  +0x104, checked for all 306 weapons in tools/emu); 0x20000 is in melee
+  (FUN_00622c40: FUN_00641530 within the range + 1 and a clear line, mask
+  0x804; under 1 always; classes 0x102 / 0x105 within the range + 8),
+  0x200 the bare line from the caster (FUN_0064e260, mask 4), 0x8000
+  hostile (FUN_00554200), 0x100 / 0x2000 out of town. Chain Lightning
+  (hit 12, FUN_005aa730) passes 0x88583 round the missile's spot, its
+  radius sHitPar1 (else the skill's), handed the struck unit's id; when the
+  pick is that unit it doesn't hop. d2d: `Fight::in_reach`,
+  `rules::ring_pick`. **FUN_0056bc80** counts
   them (callback 0x56bc70). **FUN_0056bd10** picks one (callback 0x56bcd0),
   handed the last target's unit id: the unit with the **next higher id**,
   else the **lowest id** (round the ring). So Zeal's and Fend's hits (do

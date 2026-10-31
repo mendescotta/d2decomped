@@ -855,7 +855,8 @@ void load_tables(GameData& game_data, const d2d::mpq::Stack& mpqs) {
                 std::atoi(std::string(table->get(row, "reqstr")).c_str()), std::atoi(std::string(table->get(row, "reqdex")).c_str()),
                 std::atoi(std::string(table->get(row, "levelreq")).c_str()), std::string(table->get(row, "flippyfile")),
                 std::string(table->get(row, "dropsound")), std::atoi(std::string(table->get(row, "dropsfxframe")).c_str()),
-                std::string(table->get(row, "usesound")) };
+                std::string(table->get(row, "usesound")),
+                table == &weapons ? std::atoi(std::string(table->get(row, "rangeadder")).c_str()) : 0 };
     std::vector<std::string> type_order;
     for (std::size_t row = 0; row < types.size(); ++row) {
         const std::string code(types.get(row, "Code"));

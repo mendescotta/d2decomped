@@ -2494,8 +2494,7 @@ auto Fight::move_event(const d2d::rules::Skill& skill, std::uint32_t now_ms) -> 
 auto Fight::other_target() -> void {
         const auto reach = in_reach();
         if (reach.empty()) { actor->attack_mon = -1; return; }
-        const auto next = std::ranges::upper_bound(reach, actor->attack_mon);
-        actor->attack_mon = next != reach.end() ? *next : reach.front();
+        actor->attack_mon = d2d::rules::ring_pick(reach, actor->attack_mon);   // FUN_0056bd10
         actor->player.dir = direction16(monsters[std::size_t(actor->attack_mon)].unit.x - actor->player.x, monsters[std::size_t(actor->attack_mon)].unit.y - actor->player.y);
     }
 
@@ -3049,14 +3048,28 @@ auto Fight::skill_missile_hits(Missile& missile, std::size_t monster_index, std:
         if (!missile_info.next_hit) missile.struck->push_back(int(monster_index));
         // Hit function 12 (FUN_005aa730, Chain Lightning): with hops left, on
         // from here at another monster within sHitPar1 (else aurarange)
-        // subtiles (FUN_0056bd10), a hop fewer.
-        // ponytail: the nearest one, not FUN_0056bd10's pick.
+        // subtiles, a hop fewer. FUN_0056bd10 (flags 0x8a783) over the units
+        // in the rooms round the caster's: hostile, targetable, out of town,
+        // within the radius of the missile's subtile (squared), the bare line
+        // from the caster clear of mask 4 (0x200); the next unit id above the
+        // struck one's, else the lowest id up to it: the struck one itself
+        // then hops nowhere.
         if (missile_info.hit_func == 12 && missile.hops > 1) {
             const int radius = missile_info.hit_par1 > 0 ? missile_info.hit_par1 : calc(*skill, skill->aurarange, missile.level);
-            int best = -1; float best_distance = 1e9f;
-            for (std::size_t j = 0; j < monsters.size(); ++j)
-                if (const float distance = std::hypot(monsters[j].unit.x - missile.x, monsters[j].unit.y - missile.y);
-                    j != monster_index && monsters[j].targetable() && distance * 5 <= float(radius) && distance < best_distance) { best_distance = distance; best = int(j); }
+            auto sub = [](float cells) { return int(std::floor(cells * 5)); };
+            const auto wall = [&](int at_x, int at_y) { return level->blocked((float(at_x) + 0.5f) / 5, (float(at_y) + 0.5f) / 5, 0x04); };
+            const auto rooms = near_rooms(*game_data, *level, actor->player.x, actor->player.y);
+            const bool town = d2d::rules::level_ids::is_town(level->id);
+            std::vector<int> found;
+            for (std::size_t j = 0; j < monsters.size() && !town; ++j) {
+                const auto& other = monsters[j];
+                if (!other.targetable() || other.align == 2 || !std::ranges::contains(rooms, std::pair{ level, room_of(*level, other.unit.x, other.unit.y) })) continue;
+                const int dx = sub(other.unit.x) - sub(missile.x), dy = sub(other.unit.y) - sub(missile.y);
+                if (dx * dx + dy * dy > radius * radius
+                    || d2d::rules::sight_blocked(sub(actor->player.x), sub(actor->player.y), 0, sub(other.unit.x), sub(other.unit.y), 0, wall)) continue;
+                found.push_back(int(j));
+            }
+            const int pick = d2d::rules::ring_pick(found, int(monster_index)), best = pick == int(monster_index) ? -1 : pick;
             if (best >= 0) {
                 const auto& next_target = monsters[std::size_t(best)];
                 launch(missile_info, *skill, missile.level, missile.x, missile.y, next_target.unit.x - missile.x, next_target.unit.y - missile.y, missile_info.range, now_ms).hops = missile.hops - 1;
@@ -4482,12 +4495,36 @@ auto Fight::next_target() -> bool {
         return actor->attack_mon >= 0 && monsters[std::size_t(actor->attack_mon)].alive();
     }
 
+auto Fight::weapon_range() const -> int {
+        for (const int slot : { d2d::d2s::body_location::kRightArm, d2d::d2s::body_location::kLeftArm }) {
+            const auto held = std::ranges::find_if(actor->character.items, [&](const d2d::d2s::Item& item) { return item.location == d2d::d2s::item_location::kEquipped && item.slot == slot; });
+            if (held == actor->character.items.end()) continue;
+            const auto info = game_data->rules.item_info.find(held->code);
+            if (info != game_data->rules.item_info.end() && d2d::rules::type_is(game_data->rules, info->second.type, "weap") && (held->flags & 0x4100u) == 0) return info->second.range_adder;
+        }
+        return 0;
+    }
+
 auto Fight::in_reach() const -> std::vector<int> {
         std::vector<int> out;
-        for (std::size_t i = 0; i < monsters.size(); ++i)
-            if (monsters[i].targetable() && monsters[i].align != 2   // a converted one is no foe (FUN_00554200)
-                && std::hypot(monsters[i].unit.x - actor->player.x, monsters[i].unit.y - actor->player.y) <= kMeleeReach + 0.5f)
-                out.push_back(int(i));
+        if (d2d::rules::level_ids::is_town(level->id)) return out;
+        auto sub = [](float cells) { return int(std::floor(cells * 5)); };
+        const auto wall = [&](std::uint16_t mask) { return [this, mask](int at_x, int at_y) { return level->blocked((float(at_x) + 0.5f) / 5, (float(at_y) + 0.5f) / 5, mask); }; };
+        const int range = weapon_range(), radius = range + 4, player_x = sub(actor->player.x), player_y = sub(actor->player.y);
+        const auto rooms = near_rooms(*game_data, *level, actor->player.x, actor->player.y);
+        for (std::size_t i = 0; i < monsters.size(); ++i) {
+            const auto& monster = monsters[i];
+            if (!monster.targetable() || monster.align == 2) continue;   // a converted one is no foe (FUN_00554200)
+            if (!std::ranges::contains(rooms, std::pair{ level, room_of(*level, monster.unit.x, monster.unit.y) })) continue;
+            const int dx = sub(monster.unit.x) - player_x, dy = sub(monster.unit.y) - player_y;
+            if (dx * dx + dy * dy > radius * radius) continue;
+            const int size = game_data->monsters.types[std::size_t(monster.type)].size;
+            const int apart = d2d::rules::unit_distance(dx, dy, 2, size);
+            const bool tentacle = monster.type == int(game_data->mon_bin[0x102]) || monster.type == int(game_data->mon_bin[0x105]);
+            const bool melee = (tentacle && apart < range + 8) || apart < 1
+                            || (apart <= range + 1 && !d2d::rules::sight_blocked(player_x, player_y, 2, player_x + dx, player_y + dy, size, wall(0x804)));
+            if (melee && !d2d::rules::sight_blocked(player_x, player_y, 0, player_x + dx, player_y + dy, 0, wall(0x04))) out.push_back(int(i));
+        }
         return out;
     }
 

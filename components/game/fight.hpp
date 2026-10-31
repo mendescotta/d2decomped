@@ -1081,17 +1081,22 @@ struct Fight {
     // up to the skill's, for auralencalc ticks; its aurastats (velocitypercent
     // dm34, attackrate dm56) are taken at that level.
     void frenzy(const d2d::rules::Skill& skill, std::uint32_t now_ms);
-    // Who the next strike of a chain goes for: the same monster while it
-    // lives; Zeal, else the nearest one in reach (FUN_0056bd10's search).
-    // ponytail: FUN_0056bd10's pick (it's handed the last target's id) isn't
-    // traced: nearest is assumed; Zeal doesn't change targets while one lives.
-    // Zeal's and Fend's next hit (do 13) goes round the enemies in reach;
-    // Talon's next kick stays on its monster while it lives.
+    // Who the next strike of a chain goes for: Zeal's and Fend's next hit
+    // (do 13) the next in reach by FUN_0056bd10's pick (other_target);
+    // the rest (Talon's next kick) stay on their monster while it lives.
     bool next_target();
-    // The monsters in reach, alive, by unit id (d2d's index), as
-    // FUN_0056b7e0 walks the rooms around the player.
-    // ponytail: the reach taken as melee reach (FUN_0056e510's range isn't read).
+    // The monsters in reach, by unit id (d2d's index), as FUN_0056b7e0
+    // walks the units in the rooms around the player with flags 0x2a783:
+    // within FUN_0056e510's radius (the weapon's range + 4, squared
+    // subtiles, FUN_006492a0), alive and targetable, hostile (0x8000), out
+    // of town (0x100 / 0x2000), in melee (0x20000, FUN_00622c40: within the
+    // range + 1 by FUN_00641530 and a clear line, mask 0x804; under 1 always;
+    // a tentacle or its head, classes 0x102 / 0x105, within the range + 8),
+    // the bare line to it clear of mask 4 (0x200, FUN_0064e260).
     [[nodiscard]] std::vector<int> in_reach() const;
+    // The range of the weapon in hand (FUN_00622870: FUN_0063c9b0's, the
+    // right hand's else the left's; its rangeadder), 0 with none.
+    [[nodiscard]] int weapon_range() const;
     // Closing in on the monster being attacked: in reach, swing; else the
     // point to walk to (nullopt: nothing to do).
     std::optional<std::pair<float, float>> engage(std::uint32_t now_ms);
