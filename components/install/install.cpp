@@ -529,7 +529,10 @@ auto wine_prefixes(const fs::path& home, std::string_view wineprefix, bool searc
             }
             return unquoted;
         }
-        if (!value.starts_with('"')) return std::string(value.substr(0, value.find_last_not_of(" \t\r") + 1));
+        if (!value.starts_with('"')) {
+            const auto last = value.find_last_not_of(" \t\r");
+            return last == std::string_view::npos ? std::string{} : std::string(value.substr(0, last + 1));
+        }
         for (std::size_t at = 1; at < value.size() && value[at] != '"'; ++at) {
             if (value[at] != '\\' || at + 1 == value.size()) { unquoted += value[at]; continue; }
             const char escape = value[++at];
