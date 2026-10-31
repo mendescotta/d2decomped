@@ -212,6 +212,8 @@ struct Tables {
     std::vector<Superior> superior;
     std::vector<std::string> skill_itype;                  // Skills.txt itypea1 by Id (staffmods)
     std::vector<std::pair<int, int>> skill_levels;         // Skills.txt reqlevel, maxlvl by Id (FUN_00644710 / FUN_004aa8b0)
+    // books.txt CostPerCharge by BookSpellCode (tbk, ibk): what each scroll in a tome adds to its price (FUN_0062efb0).
+    std::unordered_map<std::string, int> book_charge_cost;
     std::vector<std::pair<int, int>> skill_costs;          // Skills.txt cost mult, cost add by Id (+0x234 / +0x238: a charge's repair, FUN_00628d30)
     std::array<int, 7> class_first_skill{};                // per class its first skill Id (FUN_006460f0)
     std::vector<Special> uniques, sets;
@@ -374,7 +376,22 @@ inline bool is_repair_vendor(int hc_idx) {
 inline int item_price(const Tables& tables, const d2d::d2s::Item& item, const std::string& npc_id, bool sell,
                       const d2d::d2s::Header& header, int reduced = 0) {
     const auto found = tables.item_base.find(item.code);
-    const int base = found != tables.item_base.end() ? found->second.cost : 0;
+    int base = found != tables.item_base.end() ? found->second.cost : 0;
+    // FUN_0062efb0 prices two kinds of item by their quantity (stat 70, at least
+    // 1) before the NPC multipliers: a tome (ItemTypes book) is its cost plus
+    // books.txt CostPerCharge per scroll inside; an arrow or bolt quiver
+    // (bowq / xboq) is cost x quantity / 1024. Other stackables:
+    // ponytail: the original multiplies their price by the quantity too (keys,
+    // javelins, restocking stacks take another path), d2d still prices them once.
+    const auto info = tables.item_info.find(item.code);
+    const std::string& type = info != tables.item_info.end() ? info->second.type : std::string{};
+    const int count = std::max(item.quantity, 1);
+    if (type == "book") {
+        const auto charge = tables.book_charge_cost.find(item.code);
+        base += (charge != tables.book_charge_cost.end() ? charge->second : 0) * count;
+    } else if (type == "bowq" || type == "xboq") {
+        base = int(std::int64_t(base) * count / 1024);
+    }
     auto extra = [&](const std::vector<std::pair<int, int>>& costs, int index) {
         if (index < 0 || std::size_t(index) >= costs.size()) return 0;
         const auto [mul, add] = costs[std::size_t(index)];

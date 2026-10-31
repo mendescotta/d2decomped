@@ -166,6 +166,10 @@ struct Monster {
     UnitState unit;
     d2d::rules::MonStats stats;
     int hit_points = 1;
+    // ponytail: life_frac isn't replicated to co-op clients (replication.hpp
+    // sends hit_points only); a client's bar is under a point off. The server
+    // is authoritative.
+    int life_frac = 0;                        // 256ths of a point already taken off hit_points (life = hit_points x 256 - life_frac)
     int leader = -1;                          // index of its group's leader
     int difficulty = 0;
     float home_x = 0, home_y = 0;             // where it spawned: wandering stays near
@@ -373,6 +377,14 @@ struct Monster {
 // ponytail: S1..S4 / SQ are attack modes too for a monster holding a
 // weapon (FUN_00621580), never here; FUN_00623f50's 15..175 clamps and
 // the cast mode's skipping attackrate / other_animrate aren't applied.
+// A get-hit's length in ms: rules::get_hit_ticks on the mode's AnimData
+// record (frames and speed, the COF's for a mode animdata lacks) and the
+// unit's FHR, a tick 40 ms.
+inline std::uint32_t get_hit_ms(const GameData::AnimTiming& timing, int fhr) {
+    const int frames = int(timing.frames ? timing.frames : timing.cof_frames), speed = int(timing.speed ? timing.speed : timing.cof_speed);
+    return std::uint32_t(d2d::rules::get_hit_ticks(frames, speed, fhr)) * 40u;
+}
+
 inline int anim_rate_pct(const Monster& monster, std::string_view mode) {
     if (mode == "A1" || mode == "A2") return monster.anim_pct + d2d::rules::effective_speed(monster.props.ias);
     if (mode == "SC") return monster.anim_pct + d2d::rules::effective_speed(monster.props.fcr);
@@ -865,7 +877,10 @@ void set_mode(const GameData& game_data, Monster& monster, std::string_view mode
 // when the hit takes an eighth of its life or more; either way it notices.
 // True when this killed it.
 // ponytail: the eighth is the commonly given threshold, not traced.
-bool hurt(const GameData& game_data, Monster& monster, int damage, std::uint32_t now_ms);
+bool hurt(const GameData& game_data, Monster& monster, int damage, std::uint32_t now_ms, int fraction = 0);
+// Life back (FUN_0057a980): `points` whole points, capped at max life; a heal
+// the cap cuts leaves it at full life, no 256ths taken off.
+void heal(Monster& monster, int points);
 // Bone Armor's absorb on a monster (event 22, FUN_005c6370): the pool takes
 // the hit's physical; at 0 the state goes. The damage left.
 int soak(Monster& monster, int physical, int damage);

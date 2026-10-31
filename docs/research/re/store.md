@@ -123,7 +123,13 @@ The base y is 539 (= 60 + 255 + 224):
   stash (`FUN_00576d90`).
 - Prices (hover: "Cost: " 0xd01 in the store, "Sell value: " 0xd03 on
   your own items while it is open), per FUN_0062efb0:
-  1. base = the item's cost column (armor/weapons/misc.txt);
+  1. base = the item's cost column (armor/weapons/misc.txt). Two kinds
+     read the quantity (stat 70, at least 1) here, before every
+     multiplier: a tome (ItemTypes Book) is cost + books.txt
+     CostPerCharge x quantity (Tome of Town Portal 250 + 50 each, Tome of
+     Identify 200 + 40 each; the record is picked by the item's book id,
+     BaseCost isn't used); an arrow or bolt quiver (ItemTypes Quiver set)
+     is cost x quantity / 1024 (arrows cost 256: 350 of them 87);
   2. plus quality extras: low quality −base/2; magic prefix + suffix,
      set, unique, rare/crafted affixes, each `mul·base/1024 + add`
      from the affix/set/unique cost columns;
@@ -132,10 +138,17 @@ The base y is 539 (= 60 + 255 + 224):
      flag done on the active difficulty. The columns are the vendor's
      side: a buy takes "sell mult" and "questsellmult", a sale "buy mult"
      and "questbuymult";
-  5. × quantity for non-stackables; a sale is capped at the NPC's
-     max buy for the difficulty;
+  5. × quantity for every other item that isn't a tome or a quiver
+     (stackable or not; a stack that restocks on repair, e.g. javelins,
+     takes another path for its sale price); a sale is capped at the
+     NPC's max buy for the difficulty;
   6. a buy, gamble or repair takes the player's item_reducedprices
      (stat 87, at most 99) off: price − price × r / 100; the minimum is 1.
+  Checked live on a 1.14d host: Tome of Town Portal 450 at Akara (the scroll count wasn't read; 4 fits:
+  250 + 4 x 50); a full quiver of 350 arrows 81 at Charsi
+  (350 x 256 / 1024 = 87, x 960 / 1024). d2d: tomes and quivers follow
+  the rules above (`rules::item_price`, test_rules).
+  ponytail: other stackables (keys, javelins) are still priced once.
   Checked live on a 1.14d host (2026-10-05; Akara, Den of Evil done, a
   14% Gheed's Fortune): mp1 47, hp1 24, isc 62, tsc 78, vps 19, yps 31 =
   cost × 922 / 1024 − 14%. d2d had the columns swapped (buying at half,
