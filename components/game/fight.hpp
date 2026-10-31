@@ -424,7 +424,7 @@ struct Fight {
     int missile_sounds = 0;                // the last Missile::sound handed out
     std::uint32_t neutral_ms = 0, neutral_gap = 0;   // any monster's last Neutral and the ticks till the next may (0x7c88b8 / 0x7c88c0)
     d2d::rules::Rng sound_rng{ 0x5d1u };   // the sounds' own rolls (game.exe's are the client's seed, FUN_004e40a0), apart from the game's
-    // The floor's material at (x, y) cells (FUN_004cadb0): its tile's DT1 flags, else the level's SoundEnviron Material 1.
+    // The floor's material at (x, y) cells (FUN_004cadb0): the first floor tile's DT1 flags, else the level's SoundEnviron Material 1.
     [[nodiscard]] int floor_material_at(float x, float y) const;
     std::vector<Missile> pending;          // made this frame, joining `missiles` after its update
     std::vector<std::pair<int, int>> burned;             // this frame's burns: monster, skill

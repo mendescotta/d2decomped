@@ -236,7 +236,9 @@ each at least ⅔ of a step after the last (+0x84). The row: the first
 1) + 24 running. Material (FUN_004cadb0): the floor tile under the unit, its
 DT1 material flags 0x20 → 1 dirt, 0x08 → 2 indoor stone, 0x10 → 3 outdoor
 stone, 0x40 → 4 sand, 0x400 → 5 snow, 0x80 → 6 wood; none, the level's
-SoundEnviron Material 1. A monster's FootstepLayer plays with it at FsPrb %.
+SoundEnviron Material 1. When several floor tiles share the cell,
+FUN_004cadb0 uses the first, and the level default when that tile's flags
+name none. A monster's FootstepLayer plays with it at FsPrb %.
 
 ## Monsters (MonSounds.txt, 0x96bc5c)
 

@@ -426,11 +426,7 @@ auto Fight::monster_sounds(Monster& monster, std::uint32_t now_ms) -> void {
 
 auto Fight::floor_material_at(float x, float y) const -> int {
         const int cell_x = int(std::floor(x)), cell_y = int(std::floor(y));
-        for (const auto& floors : level->room_floors)
-            for (const auto& floor : floors)
-                if (floor.x == cell_x && floor.y == cell_y)
-                    if (const int material = d2d::rules::sound_ids::floor_material(floor.material); material > 0) return material;
-        return level->material;
+        return d2d::rules::sound_ids::first_floor_material(level->room_floors, cell_x, cell_y, level->material);
     }
 
 auto Fight::gfx() const -> const GameData::Appearance& {

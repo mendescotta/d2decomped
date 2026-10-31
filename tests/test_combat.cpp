@@ -104,6 +104,14 @@ int main(int argc, char** argv) {
         assert(steps == 4 && snd::footfall(0, 256, 2048, 2, 0) && snd::footfall(1024, 256, 2048, 2, 0) && !snd::footfall(512, 256, 2048, 2, 0));
         assert(snd::footstep(2816, 1, false) == 2816 && snd::footstep(2816, 6, true) == 2816 + 20 + 24 && snd::footstep(0, 3, false) == 0);
         assert(snd::floor_material(0x20) == 1 && snd::floor_material(0x400) == 5 && snd::floor_material(0x80) == 6 && snd::floor_material(2) == 0);
+        // FUN_004cadb0: the first tile at the cell. A flagless one keeps the level default.
+        struct FloorTile { int x, y; unsigned material; };
+        const std::vector<std::vector<FloorTile>> sand_then_wood{ { { 1, 2, 0x40 }, { 1, 2, 0x80 } } };
+        const std::vector<std::vector<FloorTile>> blank_then_sand{ { { 1, 2, 0 }, { 1, 2, 0x40 } } };
+        const std::vector<std::vector<FloorTile>> other_cell{ { { 9, 9, 0x80 } } };
+        assert(snd::first_floor_material(sand_then_wood, 1, 2, 3) == 4);
+        assert(snd::first_floor_material(blank_then_sand, 1, 2, 3) == 3);
+        assert(snd::first_floor_material(other_cell, 1, 2, 3) == 3);
         tables.item_base["hax"].hit_class = 0;
     }
     sum[17] = sum[18] = 100;                                          // enhanced damage off the weapon: no effect (op 13)
