@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
