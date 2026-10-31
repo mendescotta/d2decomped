@@ -2053,7 +2053,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                 // its srvmissilea at the target's spot (FUN_0056ede0: flag 1, none
                 // past 100), its range by the distance d (at least 1): d x Range / 12
                 // past 9, else d x Range / 24 + Range / 2; calc1 its anim rate.
-                // ponytail: d is ai_distance (FUN_006417f0 not traced); the anim rate isn't kept.
+                // d is FUN_006417f0's (ai_distance on the subtiles). ponytail: the anim rate isn't kept.
                 const int lvl = skill_level(game_data, monster, monster.skill);
                 const int apart = std::max(d2d::rules::ai_distance(subtile(foe.x) - subtile(unit.x), subtile(foe.y) - subtile(unit.y)), 1);
                 const std::size_t had = missiles.size();
