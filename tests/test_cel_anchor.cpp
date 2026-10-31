@@ -26,7 +26,7 @@ int main() {
         frame.height = std::uint32_t(sample.height);
         frame.offset_x = sample.offset_x;
         frame.offset_y = sample.offset_y;
-        frame.pixels.assign(frame.width * frame.height, 1);
+        frame.pixels.assign(std::size_t(frame.width) * frame.height, 1);
         std::vector<std::uint8_t> framebuffer(std::size_t(screen_w) * d2d::client::kScreenHeight * 4, 0);
         d2d::client::blit_at_anchor(framebuffer, frame, pal, sample.x, sample.y);
         int left = 0, top = -1, bottom = -1;
