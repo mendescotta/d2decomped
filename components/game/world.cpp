@@ -2808,8 +2808,8 @@ auto World::apply(const Command& command, std::uint32_t now_ms) -> void {
         const auto* skill = game_data->skills.get(use_skill.skill);
         const int monster_index = fight.monster_index(use_skill.unit);
         // A converted monster is the player's side: the cursor never picks it, so no attack.
-        // unverified (source: redivivus D2Client/UNIT/CUnit.cpp HitTestScreen): it drops what
-        // CanInteractWith refuses, an ally by IsAllyOf; not found in 1.14d yet.
+        // unverified (source: d2d's hover rule, cursor-units.md): a click with no unit under the
+        // cursor walks, so a held attack drops it; the hover itself is FUN_00465c60's.
         const auto* target = monster_index >= 0 ? &fight.monsters[std::size_t(monster_index)] : nullptr;
         const bool live = target && target->targetable() && !target->ally_not_interact(*game_data);
         if (skill && !skill->in_town && !in_moor) {
