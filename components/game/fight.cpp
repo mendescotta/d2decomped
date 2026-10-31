@@ -472,8 +472,8 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
         }
         actor->prate = len ? float(anim.length_ms()) / float(len) : 1.f;
         actor->pmode_until = mode == kModeDD ? 0 : now_ms + len;
-        // Struck or dying (FUN_004cc410's player branch): the hit's impact, then the class's own cry.
-        // ponytail: FUN_004b9e90's check before the GH cry isn't traced.
+        // Struck or dying (FUN_004cc410's player branch): the hit's impact, then the class's own cry,
+        // the get-hit one (modes 4 / 0x13) none while one of its speech lines plays (FUN_004b9e90: hush).
         if (mode == kModeGH || mode == kModeDT) {
             const auto impact = d2d::rules::sound_ids::impact(actor->struck_class, mode == kModeDT);
             cues.cue_on(unit_key(kSoundOnPlayer, actor->id), impact.impact, now_ms, actor->player.x, actor->player.y);
@@ -481,7 +481,7 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             actor->struck_class = 0;
             if (const int cls = actor->character.character_class; cls >= 0 && cls < 7) {
                 const auto& voice = d2d::rules::sound_ids::kPlayerVoice[std::size_t(cls)];
-                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y);
+                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y, 0, mode == kModeGH);
             }
         }
         // A block (FUN_004cb860): by the hit class the client last had (unit +0xb0), the
@@ -700,17 +700,19 @@ auto Fight::merc_calc_env() -> d2d::rules::CalcEnv {
 auto Fight::need_mana(std::uint32_t now_ms) -> void {
         static constexpr std::array<const char*, 7> kNeedMana{ "amazon_needmana_1", "sorceress_needmana_1", "necromancer_needmana_1",
             "paladin_needmana_1", "barbarian_needmana_1", "druid_needmana_1", "assassin_needmana_1" };
-        if (now_ms < actor->need_mana_until) return;
-        actor->need_mana_until = now_ms + 75 * 40;
-        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
+        class_voice(kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms);
+    }
+
+auto Fight::class_voice(std::string_view name, std::uint32_t now_ms) -> void {
+        if (name == actor->last_voice && now_ms - actor->last_voice_ms < 75 * 40) return;
+        actor->last_voice = name; actor->last_voice_ms = now_ms;
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), name, now_ms, actor->player.x, actor->player.y, true);
     }
 
 auto Fight::impossible(std::uint32_t now_ms) -> void {
         static constexpr std::array<const char*, 7> kImpossible{ "amazon_impossible_1", "sorceress_impossible_1", "necromancer_impossible_1",
             "paladin_impossible_1", "barbarian_impossible_1", "druid_impossible_1", "assassin_impossible_1" };
-        if (now_ms < actor->impossible_until) return;
-        actor->impossible_until = now_ms + 75 * 40;
-        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kImpossible[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
+        class_voice(kImpossible[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms);
     }
 
 auto Fight::start_swing(std::uint32_t now_ms) -> bool {
