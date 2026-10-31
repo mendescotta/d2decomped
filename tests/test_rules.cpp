@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -29,6 +30,12 @@ static Item item(const char* code, int quality = 2) {
 }
 
 int main() {
+    {   // FUN_0056bd10's pick: the next id up, else the lowest up to the last (itself too).
+        const std::array ids{ 7, 3, 12, 5 };
+        assert(ring_pick(ids, 5) == 7 && ring_pick(ids, 7) == 12 && ring_pick(ids, 12) == 3 && ring_pick(ids, 2) == 3);
+        const std::array alone{ 4 };
+        assert(ring_pick(alone, 4) == 4 && ring_pick(std::span<const int>{}, 4) == -1);
+    }
     Tables tables;
     tables.item_info["hax"] = { .width = 2, .height = 3, .kind = 2 };   // weapon: store tab 1
     tables.item_info["cap"] = { .width = 2, .height = 2, .kind = 1 };   // armour: tab 0

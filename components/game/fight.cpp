@@ -472,8 +472,8 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
         }
         actor->prate = len ? float(anim.length_ms()) / float(len) : 1.f;
         actor->pmode_until = mode == kModeDD ? 0 : now_ms + len;
-        // Struck or dying (FUN_004cc410's player branch): the hit's impact, then the class's own cry.
-        // ponytail: FUN_004b9e90's check before the GH cry isn't traced.
+        // Struck or dying (FUN_004cc410's player branch): the hit's impact, then the class's own cry,
+        // the get-hit one (modes 4 / 0x13) none while one of its speech lines plays (FUN_004b9e90: hush).
         if (mode == kModeGH || mode == kModeDT) {
             const auto impact = d2d::rules::sound_ids::impact(actor->struck_class, mode == kModeDT);
             cues.cue_on(unit_key(kSoundOnPlayer, actor->id), impact.impact, now_ms, actor->player.x, actor->player.y);
@@ -481,7 +481,7 @@ auto Fight::set_pmode(int mode, std::uint32_t now_ms) -> void {
             actor->struck_class = 0;
             if (const int cls = actor->character.character_class; cls >= 0 && cls < 7) {
                 const auto& voice = d2d::rules::sound_ids::kPlayerVoice[std::size_t(cls)];
-                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y);
+                cues.cue_on(unit_key(kSoundOnPlayer, actor->id), mode == kModeDT ? voice.death : voice.hit, now_ms, actor->player.x, actor->player.y, 0, mode == kModeGH);
             }
         }
         // A block (FUN_004cb860): by the hit class the client last had (unit +0xb0), the
@@ -700,17 +700,19 @@ auto Fight::merc_calc_env() -> d2d::rules::CalcEnv {
 auto Fight::need_mana(std::uint32_t now_ms) -> void {
         static constexpr std::array<const char*, 7> kNeedMana{ "amazon_needmana_1", "sorceress_needmana_1", "necromancer_needmana_1",
             "paladin_needmana_1", "barbarian_needmana_1", "druid_needmana_1", "assassin_needmana_1" };
-        if (now_ms < actor->need_mana_until) return;
-        actor->need_mana_until = now_ms + 75 * 40;
-        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
+        class_voice(kNeedMana[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms);
+    }
+
+auto Fight::class_voice(std::string_view name, std::uint32_t now_ms) -> void {
+        if (name == actor->last_voice && now_ms - actor->last_voice_ms < 75 * 40) return;
+        actor->last_voice = name; actor->last_voice_ms = now_ms;
+        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), name, now_ms, actor->player.x, actor->player.y, true);
     }
 
 auto Fight::impossible(std::uint32_t now_ms) -> void {
         static constexpr std::array<const char*, 7> kImpossible{ "amazon_impossible_1", "sorceress_impossible_1", "necromancer_impossible_1",
             "paladin_impossible_1", "barbarian_impossible_1", "druid_impossible_1", "assassin_impossible_1" };
-        if (now_ms < actor->impossible_until) return;
-        actor->impossible_until = now_ms + 75 * 40;
-        cues.cue_on(unit_key(kSoundOnPlayer, actor->id), kImpossible[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms, actor->player.x, actor->player.y);
+        class_voice(kImpossible[std::size_t(std::clamp(actor->character.character_class, 0, 6))], now_ms);
     }
 
 auto Fight::start_swing(std::uint32_t now_ms) -> bool {
@@ -1067,9 +1069,11 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         // turns at calc1 % for auralen frames: alignment 2 (FUN_005543b0) in
         // the caster's list (FUN_005b1900), its target and flag-8 states
         // dropped. One above the caster's level comes down to it, its life in
-        // proportion (state 0x6d keeps its own, stats 0xb0 / 0xb1).
-        // ponytail: FUN_00483360's operands (the decompiler drops them) read
-        // as life x clvl / mlvl.
+        // proportion (state 0x6d keeps its own, stats 0xb0 / 0xb1): MulDiv of
+        // the whole points by clvl / mlvl (FUN_00483360: ECX life, EDX clvl,
+        // mlvl on the stack; 0x5d05ed / 0x5d0600), back in 256ths (the part of
+        // a point dropped), life 1..max; a max under 1 is a 256th there, a
+        // point here (d2d keeps whole maxes).
         if (blow.hit && skill && skill->srvdofunc == ServerDoFunction::kConversion && monsters[target].alive() && monsters[target].align == 0
             && swaps_ai(*game_data, monsters[target])) {
             const int lvl = skill_level ? skill_level(skill->id) : 1;
@@ -1079,8 +1083,9 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
                 turned.align = 2; turned.set_kind = 0; turned.chase = -1;
                 if (const int clvl = int(actor->character.stats.get(d2d::d2s::kLevel)); turned.stats.level > clvl && turned.own_level == 0) {
                     turned.own_level = turned.stats.level; turned.own_max_life = turned.stats.hit_points;
-                    turned.stats.hit_points = std::max(int(std::int64_t(turned.stats.hit_points) * clvl / turned.own_level), 1);
-                    turned.hit_points = std::clamp(int(std::int64_t(turned.hit_points) * clvl / turned.own_level), 1, turned.stats.hit_points);
+                    turned.stats.hit_points = std::max(d2d::rules::mul_div(turned.stats.hit_points, clvl, turned.own_level), 1);
+                    turned.hit_points = std::clamp(d2d::rules::mul_div(turned.hit_points - (turned.life_frac > 0), clvl, turned.own_level), 1, turned.stats.hit_points);
+                    turned.life_frac = 0;
                     turned.stats.level = clvl;
                 }
             }
@@ -2494,8 +2499,7 @@ auto Fight::move_event(const d2d::rules::Skill& skill, std::uint32_t now_ms) -> 
 auto Fight::other_target() -> void {
         const auto reach = in_reach();
         if (reach.empty()) { actor->attack_mon = -1; return; }
-        const auto next = std::ranges::upper_bound(reach, actor->attack_mon);
-        actor->attack_mon = next != reach.end() ? *next : reach.front();
+        actor->attack_mon = d2d::rules::ring_pick(reach, actor->attack_mon);   // FUN_0056bd10
         actor->player.dir = direction16(monsters[std::size_t(actor->attack_mon)].unit.x - actor->player.x, monsters[std::size_t(actor->attack_mon)].unit.y - actor->player.y);
     }
 
@@ -3011,14 +3015,14 @@ auto Fight::skill_missile_hits(Missile& missile, std::size_t monster_index, std:
         // 18 (FUN_005ab0b0: Shout, Battle Orders, Battle Command) is for
         // allies; 21 (FUN_005ab500, Battle Cry) puts its auratargetstate on
         // the monster for auralen frames; 17 (FUN_005aafb0, Howl) sends one
-        // below the caster's level + calc1 + the skill level running for
-        // Param3 + Param4 x (level - 1) frames (FUN_004cc7c0); neither hurts.
+        // below the caster's level + Param2 (FUN_004efc20: skill +0x14c) +
+        // the skill level running for Param5 + Param6 x (level - 1) frames
+        // (FUN_004efcb0: the state block's frames; bugs.md 41); neither hurts.
         // Howl's run (FUN_005ddd00): on a monster swaps_ai lets, alive,
         // Terror's state (0x38, skill 77 level 1) for those frames with no
         // AI toggle at its end (FUN_0056e900), special AI 11 (FUN_005b0e00)
         // and a think next frame; Terror's think toggles back once it's
         // gone.
-        // ponytail: Howl's level sum (FUN_004efc20) read as calc1 + level.
         if (missile_info.hit_func == 18) return false;
         if (missile_info.hit_func == 21) {
             if (monsters[monster_index].cry.skill != skill->id || now_ms >= monsters[monster_index].cry.until)
@@ -3028,8 +3032,8 @@ auto Fight::skill_missile_hits(Missile& missile, std::size_t monster_index, std:
         }
         if (missile_info.hit_func == 17) {
             const int clvl = int(actor->character.stats.get(d2d::d2s::kLevel));
-            if (auto& howled = monsters[monster_index]; howled.stats.level < clvl + calc(*skill, skill->calc[0], missile.level) + missile.level && howled.alive() && swaps_ai(*game_data, howled)) {
-                put_state(*game_data, howled, howled.curse, { kTerror, 1, now_ms + std::uint32_t(std::max(skill->par[2] + (missile.level - 1) * skill->par[3], 25)) * 40 }, now_ms);
+            if (auto& howled = monsters[monster_index]; howled.stats.level < clvl + skill->par[1] + missile.level && howled.alive() && swaps_ai(*game_data, howled)) {
+                put_state(*game_data, howled, howled.curse, { kTerror, 1, now_ms + std::uint32_t(std::max(skill->par[4] + (std::max(missile.level, 1) - 1) * skill->par[5], 1)) * 40 }, now_ms);
                 ai_toggle(*game_data, howled, 11);
                 howled.next_act = now_ms + 40;
             }
@@ -3049,14 +3053,28 @@ auto Fight::skill_missile_hits(Missile& missile, std::size_t monster_index, std:
         if (!missile_info.next_hit) missile.struck->push_back(int(monster_index));
         // Hit function 12 (FUN_005aa730, Chain Lightning): with hops left, on
         // from here at another monster within sHitPar1 (else aurarange)
-        // subtiles (FUN_0056bd10), a hop fewer.
-        // ponytail: the nearest one, not FUN_0056bd10's pick.
+        // subtiles, a hop fewer. FUN_0056bd10 (flags 0x8a783) over the units
+        // in the rooms round the caster's: hostile, targetable, out of town,
+        // within the radius of the missile's subtile (squared), the bare line
+        // from the caster clear of mask 4 (0x200); the next unit id above the
+        // struck one's, else the lowest id up to it: the struck one itself
+        // then hops nowhere.
         if (missile_info.hit_func == 12 && missile.hops > 1) {
             const int radius = missile_info.hit_par1 > 0 ? missile_info.hit_par1 : calc(*skill, skill->aurarange, missile.level);
-            int best = -1; float best_distance = 1e9f;
-            for (std::size_t j = 0; j < monsters.size(); ++j)
-                if (const float distance = std::hypot(monsters[j].unit.x - missile.x, monsters[j].unit.y - missile.y);
-                    j != monster_index && monsters[j].targetable() && distance * 5 <= float(radius) && distance < best_distance) { best_distance = distance; best = int(j); }
+            auto sub = [](float cells) { return int(std::floor(cells * 5)); };
+            const auto wall = [&](int at_x, int at_y) { return level->blocked((float(at_x) + 0.5f) / 5, (float(at_y) + 0.5f) / 5, 0x04); };
+            const auto rooms = near_rooms(*game_data, *level, actor->player.x, actor->player.y);
+            const bool town = d2d::rules::level_ids::is_town(level->id);
+            std::vector<int> found;
+            for (std::size_t j = 0; j < monsters.size() && !town; ++j) {
+                const auto& other = monsters[j];
+                if (!other.targetable() || other.align == 2 || !std::ranges::contains(rooms, std::pair{ level, room_of(*level, other.unit.x, other.unit.y) })) continue;
+                const int dx = sub(other.unit.x) - sub(missile.x), dy = sub(other.unit.y) - sub(missile.y);
+                if (dx * dx + dy * dy > radius * radius
+                    || d2d::rules::sight_blocked(sub(actor->player.x), sub(actor->player.y), 0, sub(other.unit.x), sub(other.unit.y), 0, wall)) continue;
+                found.push_back(int(j));
+            }
+            const int pick = d2d::rules::ring_pick(found, int(monster_index)), best = pick == int(monster_index) ? -1 : pick;
             if (best >= 0) {
                 const auto& next_target = monsters[std::size_t(best)];
                 launch(missile_info, *skill, missile.level, missile.x, missile.y, next_target.unit.x - missile.x, next_target.unit.y - missile.y, missile_info.range, now_ms).hops = missile.hops - 1;
@@ -4482,12 +4500,36 @@ auto Fight::next_target() -> bool {
         return actor->attack_mon >= 0 && monsters[std::size_t(actor->attack_mon)].alive();
     }
 
+auto Fight::weapon_range() const -> int {
+        for (const int slot : { d2d::d2s::body_location::kRightArm, d2d::d2s::body_location::kLeftArm }) {
+            const auto held = std::ranges::find_if(actor->character.items, [&](const d2d::d2s::Item& item) { return item.location == d2d::d2s::item_location::kEquipped && item.slot == slot; });
+            if (held == actor->character.items.end()) continue;
+            const auto info = game_data->rules.item_info.find(held->code);
+            if (info != game_data->rules.item_info.end() && d2d::rules::type_is(game_data->rules, info->second.type, "weap") && (held->flags & 0x4100u) == 0) return info->second.range_adder;
+        }
+        return 0;
+    }
+
 auto Fight::in_reach() const -> std::vector<int> {
         std::vector<int> out;
-        for (std::size_t i = 0; i < monsters.size(); ++i)
-            if (monsters[i].targetable() && monsters[i].align != 2   // a converted one is no foe (FUN_00554200)
-                && std::hypot(monsters[i].unit.x - actor->player.x, monsters[i].unit.y - actor->player.y) <= kMeleeReach + 0.5f)
-                out.push_back(int(i));
+        if (d2d::rules::level_ids::is_town(level->id)) return out;
+        auto sub = [](float cells) { return int(std::floor(cells * 5)); };
+        const auto wall = [&](std::uint16_t mask) { return [this, mask](int at_x, int at_y) { return level->blocked((float(at_x) + 0.5f) / 5, (float(at_y) + 0.5f) / 5, mask); }; };
+        const int range = weapon_range(), radius = range + 4, player_x = sub(actor->player.x), player_y = sub(actor->player.y);
+        const auto rooms = near_rooms(*game_data, *level, actor->player.x, actor->player.y);
+        for (std::size_t i = 0; i < monsters.size(); ++i) {
+            const auto& monster = monsters[i];
+            if (!monster.targetable() || monster.align == 2) continue;   // a converted one is no foe (FUN_00554200)
+            if (!std::ranges::contains(rooms, std::pair{ level, room_of(*level, monster.unit.x, monster.unit.y) })) continue;
+            const int dx = sub(monster.unit.x) - player_x, dy = sub(monster.unit.y) - player_y;
+            if (dx * dx + dy * dy > radius * radius) continue;
+            const int size = game_data->monsters.types[std::size_t(monster.type)].size;
+            const int apart = d2d::rules::unit_distance(dx, dy, 2, size);
+            const bool tentacle = monster.type == int(game_data->mon_bin[0x102]) || monster.type == int(game_data->mon_bin[0x105]);
+            const bool melee = (tentacle && apart < range + 8) || apart < 1
+                            || (apart <= range + 1 && !d2d::rules::sight_blocked(player_x, player_y, 2, player_x + dx, player_y + dy, size, wall(0x804)));
+            if (melee && !d2d::rules::sight_blocked(player_x, player_y, 0, player_x + dx, player_y + dy, 0, wall(0x04))) out.push_back(int(i));
+        }
         return out;
     }
 

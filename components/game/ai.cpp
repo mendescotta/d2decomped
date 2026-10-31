@@ -860,8 +860,8 @@ bool think(const GameData& game_data, const Level& level, Monster& monster, std:
         head_off();
         return true;
     }
-    const int target_x = subtile(target->x), target_y = subtile(target->y);
-    const float dx = target->x - unit.x, dy = target->y - unit.y;
+    int target_x = subtile(target->x), target_y = subtile(target->y);
+    float dx = target->x - unit.x, dy = target->y - unit.y;
     d2d::rules::ThinkIn input{ .aip = per_difficulty.aip, .dist = best, .difficulty = monster.difficulty, .level = level.id, .state = &monster.ai_state };
     input.in_melee = d2d::rules::unit_distance(target_x - x, target_y - y, type_info.size, target->size) <= type_info.melee_rng + 1;
     input.got_hit = monster.left_mode == "GH";
@@ -911,7 +911,7 @@ bool think(const GameData& game_data, const Level& level, Monster& monster, std:
     input.velocity = type_info.velocity; input.run = type_info.run;
     input.aidel = per_difficulty.aidel ? per_difficulty.aidel : 15;
     // Act 2's: Skill4 / 5; the target's fire / cold resists (stats 0x27 /
-    // 0x2b); the second target (FUN_005ddc30) as the target; Duriel's aura
+    // 0x2b); the second target (FUN_005ddc30, below); Duriel's aura
     // on; the searches (FUN_005dd0b0) over the monsters within 80 subtiles:
     // the nearest living kin of its class (FUN_005b0d00, the Panthers'),
     // any other living one (FUN_005f06b0, the Sand Raider's), by squared
@@ -924,7 +924,38 @@ bool think(const GameData& game_data, const Level& level, Monster& monster, std:
     // skill is always usable (FUN_005fd470); the near rooms as 80 subtiles.
     input.skill45 = { !type_info.skill[3].empty(), !type_info.skill[4].empty() };
     input.target_fire_res = target->fighter.res[0]; input.target_cold_res = target->fighter.res[2];
-    input.second = true; input.second_dist = best;
+    // The second target (FUN_005ddc30): the skill-set one (FUN_005dd610)
+    // when it's the target, else FUN_005dd0b0 mode 6 (FUN_005dcbd0, as a
+    // merc's: rules::search_sight): the near rooms' foes (each room's
+    // newest first: the list from its end), alive, out of town, not its
+    // friends (FUN_005dc970), FUN_005dc380 distance, sight from them to it
+    // always tested (mask 4); FUN_005dd510's path is always found, so the
+    // primary when there's one.
+    // ponytail: no unit is ever in state 0x92 (invis).
+    Foe* second = nullptr;
+    if (monster.set_kind != 0) { second = target; input.second_dist = best; }
+    else {
+        const auto wall = [&](int at_x, int at_y) { return level.blocked((float(at_x) + 0.5f) / 5, (float(at_y) + 0.5f) / 5, 0x04); };
+        const bool town = d2d::rules::level_ids::is_town(level.id);
+        std::vector<d2d::rules::SightFoe> sight_foes;
+        std::vector<Foe*> sight_of;
+        for (const auto& [room_level, room] : near_rooms(game_data, level, unit.x, unit.y)) {
+            if (room_level != &level) continue;
+            for (std::size_t i = foes.size(); i-- > 0;) {
+                auto& foe = foes[i];
+                if (foe.of == &monster || room_at(level, foe.x, foe.y) != room) continue;
+                const int foe_x = subtile(foe.x), foe_y = subtile(foe.y);
+                auto& entry = sight_foes.emplace_back(d2d::rules::SightFoe{ d2d::rules::near_distance(foe_x - x, foe_y - y, foe.size), foe.threat,
+                                                                            foe.alive && !town && !d2d::rules::friends(monster.align, foe.of ? foe.of->align : 2) });
+                entry.blocked = entry.enemy && entry.distance < 0x31 && d2d::rules::sight_blocked(foe_x, foe_y, foe.size, x, y, type_info.size, wall);
+                sight_of.push_back(&foe);
+            }
+        }
+        int gap = 0x7fffffff;
+        const int chosen = d2d::rules::sight_choice(sight_foes, d2d::rules::search_sight(sight_foes), [](int) { return true; }, gap);
+        if (chosen >= 0) { second = sight_of[std::size_t(chosen)]; input.second_dist = gap; }
+    }
+    input.second = second != nullptr;
     input.aura_on = monster.aura != 0;
     std::vector<d2d::rules::ThinkEffect> effects;
     input.effects = &effects;
@@ -1331,9 +1362,14 @@ bool think(const GameData& game_data, const Level& level, Monster& monster, std:
         monster.skill_frame = 0; monster.skill_x = target_x; monster.skill_y = target_y; monster.at_point = false;
         attack_starts(game_data, monster, mode, rng);
     };
-    // FUN_005defe0 / FUN_005df140: n subtiles on from the target, by axis.
+    // FUN_005defe0 / FUN_005df140: n subtiles on from the target (or the
+    // second target), by axis.
+    d2d::rules::ThinkUnit away_from = d2d::rules::ThinkUnit::target;
+    input.away_from = &away_from;
     auto away = [&](int subtiles, bool running) {
-        const int off_x = subtiles * ((x > target_x) - (x < target_x)), off_y = subtiles * ((y > target_y) - (y < target_y));
+        const bool from_second = away_from == d2d::rules::ThinkUnit::second && second;
+        const int from_x = from_second ? subtile(second->x) : target_x, from_y = from_second ? subtile(second->y) : target_y;
+        const int off_x = subtiles * ((x > from_x) - (x < from_x)), off_y = subtiles * ((y > from_y) - (y < from_y));
         const float goal_x = (float(x + off_x) + 0.5f) / 5, goal_y = (float(y + off_y) + 0.5f) / 5;
         const float span = std::max(std::hypot(goal_x - unit.x, goal_y - unit.y), 0.01f), probe = std::min(0.2f, span);
         if (level.unit_blocked(goal_x, goal_y) || level.unit_blocked(unit.x + (goal_x - unit.x) / span * probe, unit.y + (goal_y - unit.y) / span * probe)) return false;
@@ -1426,8 +1462,13 @@ bool think(const GameData& game_data, const Level& level, Monster& monster, std:
         if (effect.kind == d2d::rules::ThinkEffect::aura) { monster.aura = skill_id(game_data, type_info.skill[std::size_t(effect.id)]); monster.aura_lvl = std::max(input.aip[0], 1); }
     }
     // The unit it's at: its kin (a walk to it), the hurt one or corpse it
-    // casts on; the second target is the target.
+    // casts on; the second target, in the target's place.
     using d2d::rules::ThinkUnit;
+    if (act.unit == ThinkUnit::second && second && second != target) {
+        target = second;
+        target_x = subtile(target->x); target_y = subtile(target->y);
+        dx = target->x - unit.x; dy = target->y - unit.y;
+    }
     const Monster* at_unit = act.unit == ThinkUnit::kin ? (kin >= 0 ? &pack[std::size_t(kin)] : corpse >= 0 ? &pack[std::size_t(corpse)] : nullptr)
                            : act.unit == ThinkUnit::aid && aid >= 0 ? &pack[std::size_t(aid)] : nullptr;
     // FUN_005de0f0 / FUN_005de130: its next think n frames on (a wait after its mode).
@@ -2053,7 +2094,7 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                 // its srvmissilea at the target's spot (FUN_0056ede0: flag 1, none
                 // past 100), its range by the distance d (at least 1): d x Range / 12
                 // past 9, else d x Range / 24 + Range / 2; calc1 its anim rate.
-                // ponytail: d is ai_distance (FUN_006417f0 not traced); the anim rate isn't kept.
+                // d is FUN_006417f0's (ai_distance on the subtiles). ponytail: the anim rate isn't kept.
                 const int lvl = skill_level(game_data, monster, monster.skill);
                 const int apart = std::max(d2d::rules::ai_distance(subtile(foe.x) - subtile(unit.x), subtile(foe.y) - subtile(unit.y)), 1);
                 const std::size_t had = missiles.size();
@@ -2395,13 +2436,17 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                     if (!cast->aurastate.empty() && !std::ranges::contains(cast->aurastat, d2d::d2s::kBoneArmor))
                         monster.self_state_until = now_ms + std::uint32_t(std::max(0, d2d::rules::eval_calc(game_data.skills, cast->auralen, {}, monster.skill, lvl))) * 40;
                 } else if (cast->srvdofunc == ServerDoFunction::kRegurgitatorEat) {
-                    // FUN_005cdc10: a corpse (DD) it's at eaten (gone), its life back by the corpse's.
-                    // ponytail: calc1 % of the corpse's life (FUN_00483360's args are register-passed, not read).
+                    // FUN_005cdc10: a corpse (DD) it's at eaten (gone), its life (256ths)
+                    // up by MulDiv(the corpse's max life, calc1, 100) (FUN_00483360: ECX,
+                    // EDX, then 100 on the stack), at most its max, at least 1.
                     if (monster.skill_unit >= 0 && std::size_t(monster.skill_unit) < pack.size())
                         if (auto& eaten = pack[std::size_t(monster.skill_unit)]; !eaten.alive() && eaten.mode == "DD" && !eaten.corpse_used) {
                             eaten.corpse_used = true;
                             const int pct = d2d::rules::eval_calc(game_data.skills, cast->calc[0], {}, monster.skill, lvl);
-                            monster.hit_points = std::min(monster.hit_points + std::max(eaten.stats.hit_points * pct / 100, 1), monster.stats.hit_points);
+                            const int max_life = monster.stats.hit_points * 256;
+                            const int life = monster.hit_points * 256 - monster.life_frac + d2d::rules::mul_div(eaten.stats.hit_points * 256, pct, 100);
+                            const int now = life >= max_life ? max_life : std::max(life, 1);
+                            monster.hit_points = (now + 255) >> 8; monster.life_frac = monster.hit_points * 256 - now;
                         }
                 } else if (cast->srvdofunc == ServerDoFunction::kMonsterBreath || cast->srvdofunc == ServerDoFunction::kDiabLight || cast->srvdofunc == ServerDoFunction::kImpInferno) {
                     // DiabLight: the same start (srvst 53) and its bolts while state 0xc's on (FUN_005cc690).
