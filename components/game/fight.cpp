@@ -3011,14 +3011,14 @@ auto Fight::skill_missile_hits(Missile& missile, std::size_t monster_index, std:
         // 18 (FUN_005ab0b0: Shout, Battle Orders, Battle Command) is for
         // allies; 21 (FUN_005ab500, Battle Cry) puts its auratargetstate on
         // the monster for auralen frames; 17 (FUN_005aafb0, Howl) sends one
-        // below the caster's level + calc1 + the skill level running for
-        // Param3 + Param4 x (level - 1) frames (FUN_004cc7c0); neither hurts.
+        // below the caster's level + Param2 (FUN_004efc20: skill +0x14c) +
+        // the skill level running for Param5 + Param6 x (level - 1) frames
+        // (FUN_004efcb0: the state block's frames; bugs.md 41); neither hurts.
         // Howl's run (FUN_005ddd00): on a monster swaps_ai lets, alive,
         // Terror's state (0x38, skill 77 level 1) for those frames with no
         // AI toggle at its end (FUN_0056e900), special AI 11 (FUN_005b0e00)
         // and a think next frame; Terror's think toggles back once it's
         // gone.
-        // ponytail: Howl's level sum (FUN_004efc20) read as calc1 + level.
         if (missile_info.hit_func == 18) return false;
         if (missile_info.hit_func == 21) {
             if (monsters[monster_index].cry.skill != skill->id || now_ms >= monsters[monster_index].cry.until)
@@ -3028,8 +3028,8 @@ auto Fight::skill_missile_hits(Missile& missile, std::size_t monster_index, std:
         }
         if (missile_info.hit_func == 17) {
             const int clvl = int(actor->character.stats.get(d2d::d2s::kLevel));
-            if (auto& howled = monsters[monster_index]; howled.stats.level < clvl + calc(*skill, skill->calc[0], missile.level) + missile.level && howled.alive() && swaps_ai(*game_data, howled)) {
-                put_state(*game_data, howled, howled.curse, { kTerror, 1, now_ms + std::uint32_t(std::max(skill->par[2] + (missile.level - 1) * skill->par[3], 25)) * 40 }, now_ms);
+            if (auto& howled = monsters[monster_index]; howled.stats.level < clvl + skill->par[1] + missile.level && howled.alive() && swaps_ai(*game_data, howled)) {
+                put_state(*game_data, howled, howled.curse, { kTerror, 1, now_ms + std::uint32_t(std::max(skill->par[4] + (std::max(missile.level, 1) - 1) * skill->par[5], 1)) * 40 }, now_ms);
                 ai_toggle(*game_data, howled, 11);
                 howled.next_act = now_ms + 40;
             }

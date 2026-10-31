@@ -963,8 +963,11 @@ lines (missile names aren't passed in). What it does:
   and the state on the caster (FUN_005d8290). Hit **18** (FUN_005ab0b0):
   the state on an ally it reaches. **21** (FUN_005ab500, Battle Cry): the
   auratargetstate on an enemy. **17** (FUN_005aafb0, Howl, do 22's nova):
-  a monster below the caster's level + FUN_004efc20 + the level runs
-  (FUN_005ddd00) for FUN_004cc7c0 frames.
+  a monster below the caster's level + Param2 (FUN_004efc20, skill
+  +0x14c) + the level runs (FUN_005ddd00) for Param5 + Param6 × (level −
+  1) frames (FUN_004efcb0, its 4th stack arg, the state block's +0x10);
+  FUN_004cc7c0's Param3 + Param4 × (level − 1), its 3rd, is never read
+  (bugs.md 41).
 - Do **69** (FUN_005d81c0, Find Potion) / **72** (FUN_005d8780, Find Item):
   a corpse without state 0x76 (then marked), at calc1 %: a potion
   (FUN_005d8100) / a treasure drop of a tier by Param1..4 (FUN_005a8000).
