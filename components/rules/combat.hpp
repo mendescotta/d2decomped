@@ -275,6 +275,21 @@ struct Blow {
     int hit_class = 0;                   // what the struck unit's impact sound is (sound_ids::impact)
 };
 inline int resisted(int dmg, int res) { return res >= 100 ? 0 : dmg * (100 - res) / 100; }
+// game.exe's MulDiv (FUN_00483360): value x times / over, truncated, 0 over
+// 0. Up to 0x100000 with times up to 0x10000 it multiplies in 32 bits (the
+// product wraps); a bigger times over at most times / 16 divides it first,
+// as a bigger value over at most value / 16 does the value (each multiply
+// wrapping); else 64 bits.
+inline int mul_div(int value, int times, int over) {
+    if (over == 0) return 0;
+    if (value <= 0x100000) {
+        if (times <= 0x10000) return int(std::uint32_t(value) * std::uint32_t(times)) / over;
+        if (over <= times >> 4) return int(std::uint32_t(times / over) * std::uint32_t(value));
+    } else if (over <= value >> 4) {
+        return int(std::uint32_t(value / over) * std::uint32_t(times));
+    }
+    return int(std::int64_t(value) * times / over);
+}
 // A fine damage (256ths) through a resistance as FUN_0057bf80 does it: nothing
 // at or under 0 (LAB_0057bf94) or at 100 % or more, untouched at 0 %, else
 // MulDiv (FUN_00483360), which over 0x100000 divides first and multiplies in

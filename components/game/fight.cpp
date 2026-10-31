@@ -1067,9 +1067,11 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
         // turns at calc1 % for auralen frames: alignment 2 (FUN_005543b0) in
         // the caster's list (FUN_005b1900), its target and flag-8 states
         // dropped. One above the caster's level comes down to it, its life in
-        // proportion (state 0x6d keeps its own, stats 0xb0 / 0xb1).
-        // ponytail: FUN_00483360's operands (the decompiler drops them) read
-        // as life x clvl / mlvl.
+        // proportion (state 0x6d keeps its own, stats 0xb0 / 0xb1): MulDiv of
+        // the whole points by clvl / mlvl (FUN_00483360: ECX life, EDX clvl,
+        // mlvl on the stack; 0x5d05ed / 0x5d0600), back in 256ths (the part of
+        // a point dropped), life 1..max; a max under 1 is a 256th there, a
+        // point here (d2d keeps whole maxes).
         if (blow.hit && skill && skill->srvdofunc == ServerDoFunction::kConversion && monsters[target].alive() && monsters[target].align == 0
             && swaps_ai(*game_data, monsters[target])) {
             const int lvl = skill_level ? skill_level(skill->id) : 1;
@@ -1079,8 +1081,9 @@ auto Fight::hit(std::uint32_t now_ms, float reach ) -> void {
                 turned.align = 2; turned.set_kind = 0; turned.chase = -1;
                 if (const int clvl = int(actor->character.stats.get(d2d::d2s::kLevel)); turned.stats.level > clvl && turned.own_level == 0) {
                     turned.own_level = turned.stats.level; turned.own_max_life = turned.stats.hit_points;
-                    turned.stats.hit_points = std::max(int(std::int64_t(turned.stats.hit_points) * clvl / turned.own_level), 1);
-                    turned.hit_points = std::clamp(int(std::int64_t(turned.hit_points) * clvl / turned.own_level), 1, turned.stats.hit_points);
+                    turned.stats.hit_points = std::max(d2d::rules::mul_div(turned.stats.hit_points, clvl, turned.own_level), 1);
+                    turned.hit_points = std::clamp(d2d::rules::mul_div(turned.hit_points - (turned.life_frac > 0), clvl, turned.own_level), 1, turned.stats.hit_points);
+                    turned.life_frac = 0;
                     turned.stats.level = clvl;
                 }
             }

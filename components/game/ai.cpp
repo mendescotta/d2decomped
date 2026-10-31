@@ -2436,13 +2436,17 @@ bool monster_update(const GameData& game_data, const Level& level, Monster& mons
                     if (!cast->aurastate.empty() && !std::ranges::contains(cast->aurastat, d2d::d2s::kBoneArmor))
                         monster.self_state_until = now_ms + std::uint32_t(std::max(0, d2d::rules::eval_calc(game_data.skills, cast->auralen, {}, monster.skill, lvl))) * 40;
                 } else if (cast->srvdofunc == ServerDoFunction::kRegurgitatorEat) {
-                    // FUN_005cdc10: a corpse (DD) it's at eaten (gone), its life back by the corpse's.
-                    // ponytail: calc1 % of the corpse's life (FUN_00483360's args are register-passed, not read).
+                    // FUN_005cdc10: a corpse (DD) it's at eaten (gone), its life (256ths)
+                    // up by MulDiv(the corpse's max life, calc1, 100) (FUN_00483360: ECX,
+                    // EDX, then 100 on the stack), at most its max, at least 1.
                     if (monster.skill_unit >= 0 && std::size_t(monster.skill_unit) < pack.size())
                         if (auto& eaten = pack[std::size_t(monster.skill_unit)]; !eaten.alive() && eaten.mode == "DD" && !eaten.corpse_used) {
                             eaten.corpse_used = true;
                             const int pct = d2d::rules::eval_calc(game_data.skills, cast->calc[0], {}, monster.skill, lvl);
-                            monster.hit_points = std::min(monster.hit_points + std::max(eaten.stats.hit_points * pct / 100, 1), monster.stats.hit_points);
+                            const int max_life = monster.stats.hit_points * 256;
+                            const int life = monster.hit_points * 256 - monster.life_frac + d2d::rules::mul_div(eaten.stats.hit_points * 256, pct, 100);
+                            const int now = life >= max_life ? max_life : std::max(life, 1);
+                            monster.hit_points = (now + 255) >> 8; monster.life_frac = monster.hit_points * 256 - now;
                         }
                 } else if (cast->srvdofunc == ServerDoFunction::kMonsterBreath || cast->srvdofunc == ServerDoFunction::kDiabLight || cast->srvdofunc == ServerDoFunction::kImpInferno) {
                     // DiabLight: the same start (srvst 53) and its bolts while state 0xc's on (FUN_005cc690).

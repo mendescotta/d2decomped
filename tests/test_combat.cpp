@@ -318,6 +318,12 @@ int main(int argc, char** argv) {
             dealt += std::int64_t(bolt_blow.damage) * 256 + bolt_blow.frac;
         }
         assert(std::abs(double(dealt) / kBolts / 256 - 3.0) < 0.03);
+        {   // MulDiv (FUN_00483360), cases run on game.exe in tools/emu: each branch, the wraps.
+            constexpr std::array<std::array<int, 4>, 11> kCases{ { { 25600, 40, 100, 10240 }, { 1280000, 37, 100, 473600 }, { 1048577, 3, 7, 449388 },
+                { 8388607, 99, 3, 276823998 }, { 1000, 65537, 9, 7281000 }, { 70000, 131072, 3, -1236667296 }, { 70000, 131072, 36864, 248888 },
+                { 1048576, 65536, 1, 0 }, { 5, 5, 0, 0 }, { -512, 30, 100, -153 }, { 2097152, 50, 196608, 533 } } };
+            for (const auto& [value, times, over, want] : kCases) assert(mul_div(value, times, over) == want);
+        }
         // The resistance applies to the fine roll (FUN_0057bf80, MulDiv FUN_00483360).
         assert(resisted_fine(767, 33) == 513 && resisted_fine(767, 0) == 767 && resisted_fine(767, 100) == 0 && resisted_fine(767, -100) == 1534);
         assert(resisted_fine(0x100001, 50) == 524250 && resisted_fine(0x100000, 50) == 524288);   // over 0x100000 the quotient comes first
