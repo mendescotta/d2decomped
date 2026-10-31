@@ -1848,12 +1848,14 @@ auto Town::update(std::vector<std::uint8_t>& framebuffer, const Mouse& frame_mou
             } else if (action == NpcMenuState::kResurrectMerc) {
                 net.send(cmd::ResurrectMerc{ who });
             } else if (action == NpcMenuState::kImbue) {
-                // 0x4b35b0: the menu closes and the inventory opens (UI mode
-                // 7, 0x7c0c6b); the server imbues the item in hand (C->S
-                // 0x38 kind 0). An item already in hand goes at once.
-                // unverified (source: the identify pick's pattern): the
-                // next click on an item takes it up and imbues it; the
-                // panel's own click path (0x4c0620 / 0x4c01e0) isn't traced.
+                // 0x4b35b0: the menu closes and the inventory opens; the
+                // server imbues the item in hand (C->S 0x38 kind 0).
+                // ponytail: game.exe opens a one-slot item panel (0x4c0620):
+                // the item in hand goes in its slot, identified and
+                // imbuable only (FUN_004bfc50), and the panel's button sends
+                // (FUN_004bfaf0). Here an item in hand goes at once, else
+                // the next click on an item takes it up and sends
+                // (act1-end.md "Imbue").
                 if (held) net.send(cmd::Imbue{ who });
                 else { imbue_with = who; inv_open = true; char_open = stash_open = cube_open = quest_log.open = false; }
             } else if (action == NpcMenuState::kQuest) {
