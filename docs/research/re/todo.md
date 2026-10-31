@@ -74,7 +74,7 @@ Known differences in the ones it draws, and what's left to check:
 | 25 | Timings from the COF, where AnimData.d2 is game.exe's | exact | maybe | world_view.hpp:140, fight.hpp:498, fight.hpp:729 |
 | 27 | Kind 8's visible state overlays aren't rotated after 50 ticks; active states draw together | exact | maybe | states.md, town.hpp `StateClock`; Radius is stamped and LoopWaitTime applies only to kind 6 |
 | 28 | A joined monster's act lasts 600 ms, not its animation | exact | maybe | town.cpp `net_overlay`; balloon starts and rate now traced (quests.md) |
-| 29 | COF transparent layers: which of 25 / 50 / 75 % draw effects 0..2 are | trace | maybe | unverified.md, deviations.md approximation 9 |
+| 29 | COF draw effect 6 (the max-component table) draws opaque | build | maybe | cof-draw-order.md "Draw effects", deviations.md approximation 9 |
 | 30 | Palette blends (additive / multiply missiles, blended shadows, rain) done in RGB, not through the PL2 tables | exact | slightly | deviations.md approximation 1 |
 | 31 | Static lights' shadows (type 2) not built | build | maybe | lighting.md, deviations.md approximation 5 |
 | 32 | Light Quality always high; unit shadows darken once; lit tiles per pixel, not per 32-pixel block | exact | hardly | deviations.md approximations 2–4 |

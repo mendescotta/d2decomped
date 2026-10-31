@@ -74,6 +74,8 @@ target_include_directories(test_tile_blit PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d
 d2d_add_test(test_cel_anchor game dt1 palette font dc6)   # blit_at_anchor against game.exe's cel placement (tools/emu/cel_anchor.py)
 target_sources(test_cel_anchor PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d/common.cpp)
 target_include_directories(test_cel_anchor PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d)
+d2d_add_test(test_cof_effects game dt1 palette font dc6 dcc cof)   # draw_mode against game.exe's COF draw effects (tools/emu/cof_effects.py)
+target_include_directories(test_cof_effects PRIVATE ${PROJECT_SOURCE_DIR}/apps/d2d)
 d2d_add_test(test_switches switches CLI11::CLI11)   # game.exe's one-dash switches, before CLI11
 
 # End-to-end: headless d2d driven over devctl (SDL dummy driver).
