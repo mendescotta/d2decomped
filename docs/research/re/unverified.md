@@ -13,7 +13,6 @@ trust. `git grep -n "unverified (source"` lists them.
 
 | What | Where in d2d | Source | Evidence so far | Trace in game.exe |
 |---|---|---|---|---|
-| DC6/DCC frame anchor: bottom-left, `top = y_offset - height + 1` | apps/d2d/common.hpp `blit_at_anchor` | OpenDiablo2 dcc_direction_frame.go | char-create fire.dc6 (oy=132, heights vary) lands on its logs with FUN_005005b0 subtracting frame 0's offsets; the camp fire RB sits in its ring | the DC6/DCC blitters (D2Gfx part) |
 | COF transparent layers: which alpha draw effects 0..2 are | apps/d2d/world_view.hpp `draw_mode` | OpenDiablo2's naming | none | the composite draw's blend switch (after `FUN_00470ec0`) |
 | DCC format as a whole | components/dcc/dcc.hpp | OpenDiablo2's reader, Necrolis' notes | every DCC in the MPQs decodes and draws as the game shows it | the DCC decoder (D2Cmp part) |
 | DS1 layer stream order | components/ds1/ds1.hpp | OpenDiablo2's reader | every DS1 parses to its exact size | the DS1 loader (`FUN_00665950` area) |
@@ -27,6 +26,7 @@ trust. `git grep -n "unverified (source"` lists them.
 
 | What | Traced in | Doc |
 |---|---|---|
+| DC6/DCC frame anchor: a cel's last row is y + offset_y, its first y + offset_y - height + 1 | `FUN_006014c0` (SRC/CelCmp.cpp) from the renderer slots `FUN_006c84b0` / `FUN_00511fb0`; DCC frames reach the same header via `FUN_0060bff0`; oracle `tools/emu/cel_anchor.py`, 399 cases | [cels.md](cels.md) |
 | Throw's stored base level and weapon eligibility are separate. d2d keeps Throw at level 1 and gates the weapon apart (#125: `throw_ready`, `skill_refused`). | `FUN_00647ee0` / `FUN_00647110` grant initial skills at level 1; `FUN_006442a0` reads the level; `FUN_00647640` checks equipment. 35 isolated original-code contexts passed with inventory/item helpers replaced; no C++ parity claim. | [throw.md](throw.md) |
 | TCP host join name: 2..15 bytes; ASCII letters and at most one ' - _, not first or last | `FUN_0053eff0` (length), `FUN_0052c5b0` (characters), EDI = 0x10 at `0052c726` | net-join.md "Stage 1" / "Stage 2" |
 | Character-create name: 2..15 characters; ASCII letters and at most one - _, not first or last; no apostrophes | `FUN_00430590` (input), `FUN_00430620` (OK state) | char-create-table.md "Name input and OK gating" |
