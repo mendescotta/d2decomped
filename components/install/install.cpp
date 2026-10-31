@@ -519,7 +519,7 @@ auto wine_prefixes(const fs::path& home, std::string_view wineprefix, bool searc
     add(home / ".wine");
     // A value as YAML / VDF quote it: "..." with backslash escapes (\\ \"
     // \n \t \xHH \uHHHH \UHHHHHHHH), '...' with '' for a quote, else bare.
-    auto unquote = [](std::string_view value) {
+    auto unquote = [](std::string_view value) -> std::string {
         std::string unquoted;
         if (value.starts_with('\'')) {
             for (std::size_t at = 1; at < value.size(); ++at) {
@@ -530,8 +530,9 @@ auto wine_prefixes(const fs::path& home, std::string_view wineprefix, bool searc
             return unquoted;
         }
         if (!value.starts_with('"')) {
-            const auto last = value.find_last_not_of(" \t\r");
-            return last == std::string_view::npos ? std::string{} : std::string(value.substr(0, last + 1));
+            if (const auto last = value.find_last_not_of(" \t\r"); last != std::string_view::npos)
+                unquoted.assign(value.substr(0, last + 1));
+            return unquoted;
         }
         for (std::size_t at = 1; at < value.size() && value[at] != '"'; ++at) {
             if (value[at] != '\\' || at + 1 == value.size()) { unquoted += value[at]; continue; }

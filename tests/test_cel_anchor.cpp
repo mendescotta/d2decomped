@@ -10,9 +10,11 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <exception>
 #include <vector>
 
-int main() {
+int main() try {
     struct Case { int x, y, offset_x, offset_y, width, height, left, top, bottom; };
     constexpr Case cases[]{
 #include "cel_anchor_cases.inc"
@@ -40,4 +42,7 @@ int main() {
         assert(top < 0 || left == sample.left);
     }
     return 0;
+} catch (const std::exception& error) {
+    std::fprintf(stderr, "%s\n", error.what());
+    return 1;
 }
