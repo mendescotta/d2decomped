@@ -196,8 +196,8 @@ void view_units(const Scene& scene, const View& view, float camera_x, float came
         const auto& anim = scene.npc_anim(monster.npc, down ? std::string_view("S1") : row ? monster.seq_mode : std::string_view(monster.mode));
         const auto mpf = anim.ms_per_frame();
         // No name, so no hover, for a converted one, and a click there walks.
-        // unverified (source: redivivus D2Client/UNIT/CUnit.cpp HitTestScreen): the cursor drops a unit
-        // CanInteractWith refuses (!IsAllyOf for a monster, an NPC let through); not found in 1.14d yet.
+        // game.exe's hit test (FUN_00466870) drops a unit FUN_00465c60 refuses: outside town a
+        // monster of the player's alignment (cursor-units.md).
         const bool selectable = monster.targetable() && !monster.ally_not_interact(scene);
         out.push_back({ monster.unit.x, monster.unit.y, &anim, monster.unit.dir, selectable ? &monster.npc.name : nullptr,
                         row ? now_ms - mpf * std::uint32_t(monster.seq_frame) - mpf / 2 : down && monster.mode != "S1" ? 0u : monster.unit.mode_ms, -10 - int(i) });
@@ -1848,12 +1848,14 @@ auto Town::update(std::vector<std::uint8_t>& framebuffer, const Mouse& frame_mou
             } else if (action == NpcMenuState::kResurrectMerc) {
                 net.send(cmd::ResurrectMerc{ who });
             } else if (action == NpcMenuState::kImbue) {
-                // 0x4b35b0: the menu closes and the inventory opens (UI mode
-                // 7, 0x7c0c6b); the server imbues the item in hand (C->S
-                // 0x38 kind 0). An item already in hand goes at once.
-                // unverified (source: the identify pick's pattern): the
-                // next click on an item takes it up and imbues it; the
-                // panel's own click path (0x4c0620 / 0x4c01e0) isn't traced.
+                // 0x4b35b0: the menu closes and the inventory opens; the
+                // server imbues the item in hand (C->S 0x38 kind 0).
+                // ponytail: game.exe opens a one-slot item panel (0x4c0620):
+                // the item in hand goes in its slot, identified and
+                // imbuable only (FUN_004bfc50), and the panel's button sends
+                // (FUN_004bfaf0). Here an item in hand goes at once, else
+                // the next click on an item takes it up and sends
+                // (act1-end.md "Imbue").
                 if (held) net.send(cmd::Imbue{ who });
                 else { imbue_with = who; inv_open = true; char_open = stash_open = cube_open = quest_log.open = false; }
             } else if (action == NpcMenuState::kQuest) {

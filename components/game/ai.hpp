@@ -355,9 +355,9 @@ struct Monster {
     [[nodiscard]] bool alive() const { return hit_points > 0 && !gone; }
     [[nodiscard]] bool targetable() const { return alive() && killable && !buried && !aloft && !riding; }   // unit flags 0xe: not a buried maggot, a vulture aloft, a riding imp, an unkillable one
     // On the player's side with nothing to talk about: a converted monster (align 2; a town NPC is
-    // align 2 too, but MonStats interact). The cursor drops it.
-    // unverified (source: redivivus D2Client/UNIT/CUnit.cpp HitTestScreen / CanInteractWith): an ally
-    // the player can't interact with is no hover and no pick; not found in 1.14d yet.
+    // align 2 too, but MonStats interact). The cursor drops it: outside town game.exe's hit test
+    // (FUN_00466870 -> FUN_00465c60) takes no monster of the player's alignment (cursor-units.md).
+    // ponytail: game.exe's rule is the town, MonStats2 alSel / noSel and the alignment, not interact.
     [[nodiscard]] bool ally_not_interact(const GameData& game_data) const {
         return align == 2 && !(type >= 0 && std::size_t(type) < game_data.monsters.types.size() && game_data.monsters.types[std::size_t(type)].interact);
     }

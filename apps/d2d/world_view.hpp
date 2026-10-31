@@ -147,10 +147,13 @@ inline const d2d::cof::Layer* cof_layer(const Scene::PlayerAnim& anim, std::uint
     for (const auto& layer : anim.cof.layer_defs()) if (layer.type == type) return &layer;
     return nullptr;
 }
-// A transparent COF layer's draw effect as blit_dcc_frame's mode: the
-// driver's draw modes 0..2 (a quarter, half, three quarters of the layer),
-// 3 additive, 4 multiply (like Missiles.txt Trans 1 / 2), else opaque.
-// unverified (source: OpenDiablo2's naming): which alpha each of 0..2 is.
+// A transparent COF layer's draw effect as blit_dcc_frame's mode. The
+// composite draw (FUN_00470ec0) passes the effect as the draw mode, and
+// FUN_006c8250 picks the PL2 table: 0..2 alpha tables 2, 1, 0, a quarter,
+// half, three quarters of the layer over the screen; 3 additive, 4
+// multiply (like Missiles.txt Trans 1 / 2); 5 opaque (cof-draw-order.md
+// "Draw effects", tests/test_cof_effects.cpp).
+// ponytail: effect 6 (the max-component table, PL2 +0x5b500) draws opaque.
 inline int draw_mode(int effect) {
     switch (effect) { case 0: return 3; case 1: return 4; case 2: return 5; case 3: return 1; case 4: return 2; default: return 0; }
 }
