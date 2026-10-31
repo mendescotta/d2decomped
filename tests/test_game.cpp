@@ -165,7 +165,7 @@ int main(int argc, char** argv) try {
         // bottom (left, right a row), then its rows y - r, y + r; the first
         // nearest wins.
         const auto clear_at = [](std::vector<std::pair<int, int>> clear_spots) {
-            return [clear_spots](int at_x, int at_y) { return std::ranges::contains(clear_spots, std::pair{ at_x, at_y }); };
+            return [clear_spots = std::move(clear_spots)](int at_x, int at_y) { return std::ranges::contains(clear_spots, std::pair{ at_x, at_y }); };
         };
         assert(nearest_spot(10, 10, clear_at({ { 10, 10 } })) == std::pair(10, 10));
         assert(nearest_spot(10, 10, clear_at({ { 9, 11 }, { 11, 9 } })) == std::pair(11, 9));             // corners: the top row's first

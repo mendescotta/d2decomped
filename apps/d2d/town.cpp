@@ -3828,7 +3828,7 @@ auto Town::draw_portraits(std::vector<std::uint8_t>& framebuffer, bool left_open
         const std::string key_name = key == keys::kNone ? std::string{} : id ? string_id(*scene, id) : std::string(1, char(key & 0xff));
         auto open = string_id(*scene, 0x58a3);
         if (const auto spot = open.find("%s"); spot != std::string::npos) open.replace(spot, 2, key_name);
-        draw_hover_text(framebuffer, *scene, { { string_id(*scene, 0x58a2), kTxtWhite }, { open, kTxtWhite } }, merc_portrait_x, merc_portrait_x,
+        draw_hover_text(framebuffer, *scene, { { string_id(*scene, 0x58a2), kTxtWhite }, { std::move(open), kTxtWhite } }, merc_portrait_x, merc_portrait_x,
                         merc_portrait_y + 0x24, merc_portrait_y + 0x24);
     }
 }
